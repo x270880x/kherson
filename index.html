@@ -8,7 +8,7 @@
 <title>Кадастровая карта — Херсонская область</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script defer src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
   :root {
@@ -217,8 +217,8 @@
   .leaflet-tooltip .praion { color: #555; font-size: 8px; margin-top: 1px; }
   .leaflet-popup-content .pstats, .leaflet-tooltip .pstats { margin-top: 3px; color: #555; font-size: 9px; font-family: 'IBM Plex Mono', monospace; }
   /* Переключатель слоёв — иконка-шестерёнка */
-  .leaflet-control-layers-toggle { background-image: none !important; width: 34px; height: 34px; position: relative; }
-  .leaflet-control-layers-toggle::before { content: '⚙'; font-size: 22px; line-height: 34px; text-align: center; display: block; color: #333; }
+  .leaflet-control-layers-toggle { background-image: none !important; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; }
+  .leaflet-control-layers-toggle svg { width: 20px; height: 20px; fill: #333; }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -580,6 +580,11 @@ L.control.layers({
   'Схема светлая': baseLight,
   'Спутник': baseSat,
 }, null, { collapsed: true, position: 'topright' }).addTo(map);
+// Иконка слоёв — шестерёнка (SVG)
+(() => {
+  const tog = document.querySelector('.leaflet-control-layers-toggle');
+  if (tog) tog.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>';
+})();
 
 let markers = {};
 let activeCode = null;
