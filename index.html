@@ -536,7 +536,7 @@ function buildParcelPopup(cad, data, council) {
   return `
     <div style="font-size:12px;color:#e8e8e8;max-width:320px;line-height:1.45">
       <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:#e8c547;font-size:13px;margin-bottom:2px">${cad}</div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:6px">${data.a} га · ${council ? council.name : ''}</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:6px">${data.a} га · ${council ? escapeHtml(ruName(council.name)) : ''}</div>
       ${data.r ? `<div><b style="color:#aaa">аренд.:</b> ${data.r}</div>` : ''}
       ${data.o ? `<div><b style="color:#aaa">собств.:</b> ${data.o}</div>` : ''}
       ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
