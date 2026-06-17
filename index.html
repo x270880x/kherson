@@ -70,6 +70,16 @@
     border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1;
   }
   .detail-close:hover { color: var(--text); border-color: var(--accent); }
+  .detail-reopen {
+    position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+    z-index: 1099; display: none;
+    background: var(--surface); color: var(--accent);
+    border: 1px solid var(--border); border-right: none;
+    border-radius: 6px 0 0 6px; padding: 16px 5px; cursor: pointer;
+    font-size: 15px; line-height: 1; box-shadow: -3px 0 10px rgba(0,0,0,0.35);
+  }
+  .detail-reopen.show { display: block; }
+  .detail-reopen:hover { color: var(--text); border-color: var(--accent); }
   #map { flex: 1; background: #0a0e15; }
 
   .filter-group { margin-bottom: 16px; }
@@ -298,11 +308,12 @@
   <div id="map"></div>
 
   <aside class="right">
-    <button id="detail-close" class="detail-close" type="button" aria-label="Свернуть панель" title="Свернуть">✕</button>
+    <button id="detail-close" class="detail-close" type="button" aria-label="Свернуть панель" title="Свернуть">›</button>
     <div id="detail" class="detail-empty">
       Клик по маркеру сельсовета — детали и список участков
     </div>
   </aside>
+  <button id="detail-reopen" class="detail-reopen" type="button" aria-label="Развернуть панель" title="Развернуть">‹</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -344,6 +355,21 @@ const OWN_SHORT = {
   'Не визначено': 'Не опр.'
 };
 const ruOwnShort = s => OWN_SHORT[s] || ruOwn(s).replace(' собственность', '');
+
+// Название села: русское (из скобок, крупно) + украинское мелким снизу
+function nameParts(name) {
+  const m = (name || '').match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (!m) return { ru: name || '', ua: '' };
+  const ua = m[1].trim();
+  const pm = ua.match(/^(с\.|смт|м\.|пгт|с-ще)\s+/i);
+  return { ru: (pm ? pm[0] : '') + m[2].trim(), ua };
+}
+function nameH2(name) {
+  const p = nameParts(name);
+  return p.ua
+    ? `${escapeHtml(p.ru)}<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px">${escapeHtml(p.ua)}</span>`
+    : escapeHtml(p.ru);
+}
 
 // Пересчитать заголовочную статистику по сводкам только херсонских советов,
 // чтобы панель цифр совпадала с тем, что показано на карте.
@@ -678,6 +704,7 @@ async function showDetail(code) {
   const c = COUNCILS.find(x => x.code === code);
   if (!c) return;
   document.querySelector('aside.right').classList.add('open');  // выдвинуть панель
+  document.getElementById('detail-reopen').classList.remove('show');
   const det = document.getElementById('detail');
   det.classList.remove('detail-empty');
   // Show loading state immediately
@@ -685,7 +712,7 @@ async function showDetail(code) {
     det.innerHTML = `
       <div class="detail-header">
         <div class="code">${c.code}</div>
-        <h2>${c.name}</h2>
+        <h2>${nameH2(c.name)}</h2>
         <div class="meta"><span>${c.total} участков</span><span>${c.area.toLocaleString('ru')} га</span></div>
       </div>
       <div style="padding:16px;color:var(--muted);font-size:12px">Загружаю участки…</div>
@@ -708,7 +735,7 @@ async function showDetail(code) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1">
           <div class="code">${c.code}</div>
-          <h2>${c.name}</h2>
+          <h2>${nameH2(c.name)}</h2>
           <div class="meta">
             <span>${c.total} участков</span>
             <span>${c.area.toLocaleString('ru')} га</span>
@@ -1302,7 +1329,12 @@ document.addEventListener('click', e => {
 
 renderSidebar();
 document.getElementById('detail-close').addEventListener('click', () => {
-  document.querySelector('aside.right').classList.remove('open');  // свернуть панель
+  document.querySelector('aside.right').classList.remove('open');   // свернуть (уехала вправо)
+  document.getElementById('detail-reopen').classList.add('show');   // показать язычок разворота
+});
+document.getElementById('detail-reopen').addEventListener('click', () => {
+  document.querySelector('aside.right').classList.add('open');      // развернуть обратно
+  document.getElementById('detail-reopen').classList.remove('show');
 });
 buildMarkers();
 
