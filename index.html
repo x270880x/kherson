@@ -51,7 +51,7 @@
   }
   header .left .hstats .v { color: var(--accent); font-weight: 600; }
   header .left .hstats .v.mz { color: #c050ff; }
-  header .left .hstats .sep { color: #3a3f55; margin: 0 5px; }
+  header .left .hstats .sep { color: #3a3f55; margin: 0 2.5px; }
 
   .layout { display: flex; flex: 1; min-height: 0; position: relative; }
   aside.left {
@@ -248,12 +248,13 @@
   #mobile-filters-btn { display: none; }
   @media (max-width: 768px) {
     /* Компактная шапка */
-    header { flex-wrap: wrap; gap: 6px 10px; padding: 7px 10px; }
-    header .gerb { height: 32px; margin-right: 0; }
-    header h1 { font-size: 14px; white-space: normal; }
+    header { flex-wrap: nowrap; align-items: flex-start; gap: 10px; padding: 8px 12px; }
+    header .gerb { height: 34px; margin-right: 0; flex-shrink: 0; }
+    header .left { flex: 1; min-width: 0; }
+    header h1 { font-size: 15px; white-space: normal; line-height: 1.15; }
     header .left .label { font-size: 8px; letter-spacing: 1px; }
-    header .left .hstats { font-size: 10px; margin-top: 3px; }
-    header .left .hstats .sep { margin: 0 3px; }
+    header .left .hstats { font-size: 10.5px; margin-top: 4px; line-height: 1.45; }
+    header .left .hstats .sep { margin: 0 1.5px; }
     #mobile-filters-btn {
       display: flex; align-items: center; justify-content: center;
       position: absolute; top: 10px; left: 10px; z-index: 1000;
@@ -279,7 +280,7 @@
   <div class="left">
     <div class="label">КАДАСТРОВАЯ КАРТА</div>
     <h1>Херсонская область</h1>
-    <div class="hstats" id="hstats"><span class="v" id="hstat-parcels">0</span> участков<span class="sep">·</span><span class="v" id="hstat-area">0</span> га<span class="sep">·</span><span class="v" id="hstat-councils">0</span> сельсоветов<span class="sep">·</span><span class="v" id="hstat-raions">0</span> районов<span class="sep">·</span><span class="v mz" id="hstat-mz">0</span> размежёвано</div>
+    <div class="hstats" id="hstats"><span class="v" id="hstat-parcels">0</span>&nbsp;участков<span class="sep">·</span><wbr><span class="v" id="hstat-area">0</span>&nbsp;га<span class="sep">·</span><wbr><span class="v" id="hstat-councils">0</span>&nbsp;сельсоветов<span class="sep">·</span><wbr><span class="v" id="hstat-raions">0</span>&nbsp;районов<span class="sep">·</span><wbr><span class="v mz" id="hstat-mz">0</span>&nbsp;размежёвано</div>
   </div>
 </header>
 
