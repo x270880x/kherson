@@ -42,7 +42,8 @@
     font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
   }
-  header h1 { font-size: 17px; font-weight: 700; color: #fff; }
+  header h1 { font-size: 17px; font-weight: 700; color: #fff; white-space: nowrap; }
+  header .left { display: flex; flex-direction: column; justify-content: center; }
   header .right { display: flex; align-items: stretch; font-family: 'IBM Plex Mono', monospace; }
   header .right > div { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 120px; padding: 2px 8px; border-left: 1px solid var(--border); box-sizing: border-box; }
   header .right > div:first-child { border-left: none; }
@@ -215,6 +216,9 @@
   .leaflet-popup-content .pname, .leaflet-tooltip .pname { font-weight: 700; color: #1a1a1a; font-size: 12px; }
   .leaflet-tooltip .praion { color: #555; font-size: 8px; margin-top: 1px; }
   .leaflet-popup-content .pstats, .leaflet-tooltip .pstats { margin-top: 3px; color: #555; font-size: 9px; font-family: 'IBM Plex Mono', monospace; }
+  /* Переключатель слоёв — иконка-шестерёнка */
+  .leaflet-control-layers-toggle { background-image: none !important; width: 34px; height: 34px; position: relative; }
+  .leaflet-control-layers-toggle::before { content: '⚙'; font-size: 22px; line-height: 34px; text-align: center; display: block; color: #333; }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -575,7 +579,7 @@ L.control.layers({
   'Схема тёмная': baseDark,
   'Схема светлая': baseLight,
   'Спутник': baseSat,
-}, null, { collapsed: false, position: 'topright' }).addTo(map);
+}, null, { collapsed: true, position: 'topright' }).addTo(map);
 
 let markers = {};
 let activeCode = null;
