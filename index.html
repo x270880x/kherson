@@ -245,8 +245,8 @@
 <div class="layout">
   <aside class="left">
     <div class="filter-group">
-      <label>Поиск (кадастр или ФИО/компания)</label>
-      <input id="search" type="text" placeholder="напр. 6523884500 или АГРОДОМ" autocomplete="off"/>
+      <label>Поиск (кадастр UA/РФ, ФИО/компания)</label>
+      <input id="search" type="text" placeholder="напр. 6523884500, 90:01:0101015:1234 или АГРОДОМ" autocomplete="off"/>
       <div id="search-results"></div>
     </div>
 
@@ -1217,7 +1217,8 @@ async function navigateToParcel(cadnum) {
   }
 }
 
-const CADNUM_RE = /^\d{10}:\d{2}:\d{3}:\d{4}$/;
+const CADNUM_RE = /^\d{10}:\d{2}:\d{3}:\d{4}$/;        // украинский кадастр
+const RF_CADNUM_RE = /^\d{2}:\d{2}:\d{5,7}:\d{1,}$/;   // кадастр РФ (напр. 90:01:0101015:1234)
 
 search.addEventListener('input', e => {
   const q = e.target.value.trim();
@@ -1225,6 +1226,12 @@ search.addEventListener('input', e => {
   // Full cadnum: navigate directly
   if (CADNUM_RE.test(q)) {
     navigateToParcel(q);
+    return;
+  }
+  // Кадастр РФ: формат распознаём, но данных по РФ-номерам в базе нет
+  if (RF_CADNUM_RE.test(q)) {
+    sr.innerHTML = `<div class="item" style="color:var(--muted)">РФ-кадастр <b style="color:var(--text)">${escapeHtml(q)}</b> — база ведётся по украинскому кадастру, данных по РФ-номерам нет</div>`;
+    sr.style.display = 'block';
     return;
   }
   // Partial cadnum starting with digits: suggest opening council
