@@ -283,11 +283,11 @@
     <div style="height: 16px"></div>
 
     <div class="stats-block" style="border:1px solid var(--accent)">
-      <h3>🛒 Корзина: <span id="basket-count" style="color:var(--accent)">0</span> участков</h3>
-      <textarea id="basket-input" placeholder="Вставьте кадастры через перенос строки или запятую — добавятся в корзину" rows="3" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;resize:vertical;margin-bottom:6px"></textarea>
-      <button id="btn-basket-add" class="btn-export" style="margin-bottom:4px">Добавить в корзину</button>
-      <button id="btn-basket-export" class="btn-export" style="background:var(--green);color:#fff;border-color:var(--green);margin-bottom:4px">📥 Выгрузить корзину</button>
-      <button id="btn-basket-clear" class="btn-reset" style="margin-bottom:0">Очистить корзину</button>
+      <h3>📋 Подборка: <span id="basket-count" style="color:var(--accent)">0</span> участков</h3>
+      <textarea id="basket-input" placeholder="Вставьте кадастры через перенос строки или запятую — добавятся в подборку" rows="3" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;resize:vertical;margin-bottom:6px"></textarea>
+      <button id="btn-basket-add" class="btn-export" style="margin-bottom:4px">Добавить в подборку</button>
+      <button id="btn-basket-export" class="btn-export" style="background:var(--green);color:#fff;border-color:var(--green);margin-bottom:4px">📥 Выгрузить подборку</button>
+      <button id="btn-basket-clear" class="btn-reset" style="margin-bottom:0">Очистить подборку</button>
       <div style="color:var(--muted);font-size:10px;margin-top:6px">Клик по полигону на карте — тоже добавит/уберёт</div>
     </div>
 
@@ -428,7 +428,7 @@ async function loadCouncilPolygons(code) {
           if (basket.has(cad)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
           else layer.resetStyle(l);
         });
-        // Shift+click — добавить/убрать из корзины
+        // Shift+click — добавить/убрать из подборки
         l.on('click', e => {
           if (e.originalEvent.shiftKey) {
             basketToggle(cad);
@@ -466,7 +466,7 @@ function parcelStyle(f, council) {
 
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
-  const basketBtn = `<button onclick="basketToggle('${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e05252':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из корзины':'+ в корзину'}</button>`;
+  const basketBtn = `<button onclick="basketToggle('${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e05252':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
   if (!data) {
     return `<div style="font-size:12px;color:#e8c547"><div style="font-family:'IBM Plex Mono',monospace;font-weight:600">${cad}</div><div style="color:#aaa;font-size:11px">нет данных в базе</div>${basketBtn}</div>`;
   }
@@ -1037,7 +1037,7 @@ document.getElementById('filter-mz').addEventListener('change', e => {
   if (activeCode) showDetail(activeCode);
 });
 
-// ── 🛒 Корзина участков ──
+// ── 📋 Подборка участков ──
 const basket = new Set();
 function basketUpdate() {
   document.getElementById('basket-count').textContent = basket.size;
@@ -1074,16 +1074,16 @@ document.getElementById('btn-basket-add').addEventListener('click', () => {
   }
   document.getElementById('basket-input').value = '';
   basketUpdate();
-  alert(`Найдено ${cads.length}, добавлено ${added} (${cads.length-added} уже в корзине)`);
+  alert(`Найдено ${cads.length}, добавлено ${added} (${cads.length-added} уже в подборке)`);
 });
 document.getElementById('btn-basket-clear').addEventListener('click', () => {
   if (basket.size === 0) return;
-  if (!confirm(`Очистить корзину (${basket.size} участков)?`)) return;
+  if (!confirm(`Очистить подборку (${basket.size} участков)?`)) return;
   basket.clear();
   basketUpdate();
 });
 document.getElementById('btn-basket-export').addEventListener('click', async () => {
-  if (basket.size === 0) { alert('Корзина пуста'); return; }
+  if (basket.size === 0) { alert('Подборка пуста'); return; }
   const btn = document.getElementById('btn-basket-export');
   const orig = btn.textContent;
   btn.disabled = true;
@@ -1116,7 +1116,7 @@ document.getElementById('btn-basket-export').addEventListener('click', async () 
       }
     }
     const stamp = new Date().toISOString().slice(0,10);
-    downloadXlsx(rows, `Корзина_${rows.length}_${stamp}.xlsx`, 'Корзина');
+    downloadXlsx(rows, `Подборка_${rows.length}_${stamp}.xlsx`, 'Подборка');
     if (missing > 0) console.log(`${missing} кадастров не найдены в базе — вписаны пустые строки`);
   } catch (e) {
     alert('Ошибка: ' + (e.message || e));
