@@ -358,7 +358,7 @@ const ownColor = s => OWN_COLOR[s] || '#e05252';
 })();
 
 // Init map
-const map = L.map('map', { zoomControl: true, attributionControl: true, maxZoom: 19 }).setView([46.88, 34.40], 10);
+const map = L.map('map', { zoomControl: true, attributionControl: true, maxZoom: 19, preferCanvas: true }).setView([46.88, 34.40], 10);
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
@@ -404,8 +404,21 @@ async function ensureCouncilParcels(council) {
   return result;
 }
 
+let activePolyCode = null;
+// Показывать полигоны только текущего села; полигоны прошлого убираем с карты (но держим в кэше)
+function showOnlyPolygons(code) {
+  if (!polygonsVisible) return;
+  if (activePolyCode && activePolyCode !== code) {
+    const prev = polygonLayers[activePolyCode];
+    if (prev && map.hasLayer(prev)) map.removeLayer(prev);
+  }
+  const cur = polygonLayers[code];
+  if (cur && !map.hasLayer(cur)) cur.addTo(map);
+  activePolyCode = code;
+}
+
 async function loadCouncilPolygons(code) {
-  if (polygonLayers[code]) return polygonLayers[code];
+  if (polygonLayers[code]) { showOnlyPolygons(code); return polygonLayers[code]; }
   const council = COUNCILS.find(c => c.code === code);
   if (!council) return null;
   // Ensure council data is loaded for popup info
@@ -415,32 +428,36 @@ async function loadCouncilPolygons(code) {
     if (!resp.ok) return null;
     const fc = await resp.json();
     const layer = L.geoJSON(fc, {
+      smoothFactor: 2,
       style: f => parcelStyle(f, council),
+      // Лёгкий проход: только подсветка участков из подборки. Попапы/события — делегированы на слой (ниже).
       onEachFeature: (f, l) => {
-        const cad = f.properties.cadnum;
-        parcelGeomIndex[cad] = f;
-        const data = (council.parcels || []).find(p => p.c === cad);
-        l.bindPopup(buildParcelPopup(cad, data, council));
-        l.on('mouseover', () => {
-          if (!basket.has(cad)) l.setStyle({ weight: 2, color: '#fff' });
-        });
-        l.on('mouseout', () => {
-          if (basket.has(cad)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
-          else layer.resetStyle(l);
-        });
-        // Shift+click — добавить/убрать из подборки
-        l.on('click', e => {
-          if (e.originalEvent.shiftKey) {
-            basketToggle(cad);
-            L.DomEvent.stopPropagation(e);
-          }
-        });
-        // Apply selected style if in basket
-        if (basket.has(cad)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
+        if (basket.has(f.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
       }
     });
-    if (polygonsVisible) layer.addTo(map);
+    // Делегирование на весь слой вместо обработчиков на каждом из тысяч участков
+    layer.on('mouseover', e => {
+      const l = e.layer;
+      if (!basket.has(l.feature.properties.cadnum)) l.setStyle({ weight: 2, color: '#fff' });
+    });
+    layer.on('mouseout', e => {
+      const l = e.layer;
+      if (basket.has(l.feature.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
+      else layer.resetStyle(l);
+    });
+    layer.on('click', e => {
+      const l = e.layer, cad = l.feature.properties.cadnum;
+      if (e.originalEvent.shiftKey) {            // Shift+клик — добавить/убрать из подборки
+        basketToggle(cad);
+        L.DomEvent.stopPropagation(e);
+        return;
+      }
+      // Ленивый попап: данные ищем только при клике, а не для всех участков сразу (раньше был O(n²))
+      const data = (council.parcels || []).find(p => p.c === cad);
+      l.bindPopup(buildParcelPopup(cad, data, council)).openPopup();
+    });
     polygonLayers[code] = layer;
+    showOnlyPolygons(code);
     return layer;
   } catch (e) {
     console.warn(`No polygons for ${code}:`, e);
@@ -1170,6 +1187,8 @@ async function navigateToParcel(cadnum) {
     // Zoom to parcel + open popup
     const b = target.getBounds();
     map.fitBounds(b, { padding: [60, 60], maxZoom: 18 });
+    const pdata = (council.parcels || []).find(p => p.c === cadnum);
+    target.bindPopup(buildParcelPopup(cadnum, pdata, council));
     setTimeout(() => target.openPopup(), 600);
     // Briefly highlight
     target.setStyle({ weight: 3, color: '#ff0' });
