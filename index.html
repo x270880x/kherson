@@ -778,7 +778,7 @@ function buildMarkers() {
     m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       direction: 'top', offset: [0, -sz/2], opacity: 0.95
     });
-    m.on('click', () => focusCouncil(c.code, Math.log2(1.5)));  // клик по селу → плавно приблизить к участкам ×1.5
+    m.on('click', () => focusCouncil(c.code));  // клик по селу → плавно вписать все участки кластера в окно
     markers[c.code] = m;
   });
   restyleFilteredPolygons();
@@ -1375,13 +1375,39 @@ const search = document.getElementById('search');
 const sr = document.getElementById('search-results');
 
 // Открыть село и подогнать его контуры на весь экран (учитывая правую панель)
+// Bounds по основному кластеру участков: отсекаем географические выбросы
+// (заборы Тьюки Q±3·IQR по каждой оси) — в данных встречаются «улетевшие» участки,
+// которые иначе раздувают bounds и кидают карту в центр области.
+function clusterBounds(layer) {
+  const boxes = [];
+  layer.eachLayer(l => {
+    const b = l.getBounds ? l.getBounds() : (l.getLatLng ? L.latLngBounds(l.getLatLng(), l.getLatLng()) : null);
+    if (b && b.isValid()) boxes.push(b);
+  });
+  if (!boxes.length) return null;
+  const unionAll = () => boxes.reduce((a, b) => a ? a.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast()), null);
+  if (boxes.length < 8) return unionAll();
+  const q = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.round((arr.length - 1) * p)))];
+  // забор Тьюки с «полом»: отсекаем только грубые выбросы (десятки км), нормальный разброс села (floor) сохраняем
+  const fence = (arr, floor) => { arr.sort((a, b) => a - b); const q1 = q(arr, 0.25), q3 = q(arr, 0.75); const h = Math.max(3 * (q3 - q1), floor); return [q1 - h - 1e-9, q3 + h + 1e-9]; };
+  const [loLa, hiLa] = fence(boxes.map(b => b.getCenter().lat), 0.18);
+  const [loLn, hiLn] = fence(boxes.map(b => b.getCenter().lng), 0.22);
+  let out = null;
+  for (const b of boxes) {
+    const c = b.getCenter();
+    if (c.lat >= loLa && c.lat <= hiLa && c.lng >= loLn && c.lng <= hiLn)
+      out = out ? out.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+  }
+  return out || unionAll();
+}
+
 async function focusCouncil(code, closer = 0) {
   showDetail(code);
   const layer = await loadCouncilPolygons(code);
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  if (layer && layer.getLayers().length) {
-    // Плавное приближение одним движением (flyTo): целевой зум = вписать участки + доп. кратность (closer = log2)
-    const bounds = layer.getBounds();
+  const bounds = layer && layer.getLayers().length ? clusterBounds(layer) : null;
+  if (bounds && bounds.isValid()) {
+    // Плавно (flyTo) вписываем ВЕСЬ кластер участков в окно (без зума за пределы fit — все участки видны)
     const padTL = L.point(40, 40);
     const padBR = L.point(isMobile ? 40 : 300, 40);
     let z = Math.min(map.getMaxZoom(), map.getBoundsZoom(bounds, false, padTL.add(padBR)) + closer);
