@@ -771,7 +771,7 @@ function buildMarkers() {
     m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       direction: 'top', offset: [0, -sz/2], opacity: 0.95
     });
-    m.on('click', () => focusCouncil(c.code, 1));  // клик по селу → приблизить к участкам ×2
+    m.on('click', () => focusCouncil(c.code, Math.log2(1.7)));  // клик по селу → приблизить к участкам ×1.7
     markers[c.code] = m;
   });
   restyleFilteredPolygons();
@@ -1373,7 +1373,7 @@ async function focusCouncil(code, closer = 0) {
   if (layer && layer.getLayers().length) {
     // animate:false — без анимации зума, чтобы тёмная схема не мерцала светлым
     map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: isMobile ? [40, 40] : [300, 40], animate: false });
-    if (closer) map.setZoom(Math.min(map.getMaxZoom(), map.getZoom() + closer), { animate: false });  // ×2 ближе
+    if (closer) map.setZoom(Math.min(map.getMaxZoom(), map.getZoom() + closer), { animate: false });  // ×1.7 ближе (closer = log2 кратности)
   } else {
     const c = COUNCILS.find(x => x.code === code);
     if (c && c.lat) map.setView([c.lat, c.lon], 13 + closer, { animate: false });
