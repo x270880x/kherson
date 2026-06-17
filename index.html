@@ -720,6 +720,7 @@ async function showDetail(code) {
   if (!c) return;
   document.querySelector('aside.right').classList.add('open');  // выдвинуть панель
   document.getElementById('detail-reopen').classList.remove('show');
+  basketView = false;   // клик по селу — выходим из режима подборки
   const det = document.getElementById('detail');
   det.classList.remove('detail-empty');
   // Show loading state immediately
@@ -1101,6 +1102,34 @@ document.getElementById('filter-mz').addEventListener('change', e => {
 
 // ── 📋 Подборка участков ──
 const basket = new Set();
+let basketView = false;
+// Список выбранных участков в правой панели
+function renderBasketPanel() {
+  basketView = true;
+  const det = document.getElementById('detail');
+  det.classList.remove('detail-empty');
+  const items = [...basket];
+  const CAP = 300, shown = items.slice(0, CAP);
+  det.innerHTML = `
+    <div class="detail-header">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h2>📌 Подборка</h2>
+        ${items.length ? `<button class="btn-export-sm" onclick="document.getElementById('btn-basket-export').click()">📥 Excel</button>` : ''}
+      </div>
+      <div class="meta"><span>${items.length} участков</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="bar-list" style="max-height:none">
+        ${items.length ? shown.map(cad => `
+          <div class="bar-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border)">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);word-break:break-all">${cad}</span>
+            <button onclick="basketToggle('${cad}')" title="убрать" style="background:none;border:none;color:#e05252;cursor:pointer;font-size:14px;flex-shrink:0;line-height:1">✕</button>
+          </div>`).join('') + (items.length > CAP ? `<div style="color:var(--muted);font-size:11px;padding:8px 0">…и ещё ${items.length - CAP}. Полный список — в выгрузке Excel.</div>` : '') : '<div style="color:var(--muted);font-size:12px;padding:8px 0">Подборка пуста</div>'}
+      </div>
+    </div>`;
+  document.querySelector('aside.right').classList.add('open');
+  document.getElementById('detail-reopen').classList.remove('show');
+}
 function basketUpdate() {
   document.getElementById('basket-count').textContent = basket.size;
   // Refresh polygon styles in loaded layers
@@ -1115,6 +1144,7 @@ function basketUpdate() {
       }
     });
   }
+  if (basket.size > 0 || basketView) renderBasketPanel();
 }
 function basketToggle(cadnum) {
   if (basket.has(cadnum)) basket.delete(cadnum);
