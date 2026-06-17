@@ -45,45 +45,13 @@
   }
   header h1 { font-size: 17px; font-weight: 700; color: #fff; white-space: nowrap; }
   header .left { display: flex; flex-direction: column; justify-content: center; }
-  header .right { display: flex; align-items: stretch; font-family: 'IBM Plex Mono', monospace; }
-  header .right .stat { display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
-  header .right .vl { display: flex; }
-  header .right .ic { display: none; }
-  header .right .ic svg { width: 15px; height: 15px; display: block; }
-  header .right .ubar { display: none; }
-  header .right .v { color: var(--accent); font-weight: 600; font-size: 15px; line-height: 1.1; }
-  header .right .l { color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 1.5px; }
-  /* v0 — текущий */
-  header .right.v0 .stat { flex-direction: column; width: 120px; padding: 2px 8px; border-left: 1px solid var(--border); }
-  header .right.v0 .stat:first-child { border-left: none; }
-  header .right.v0 .vl { flex-direction: column; align-items: center; }
-  header .right.v0 .l { margin-top: 3px; }
-  /* v1 — карточки с иконками */
-  header .right.v1 { gap: 10px; align-items: center; }
-  header .right.v1 .stat { flex-direction: column; gap: 2px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 7px 16px; }
-  header .right.v1 .ic { display: block; color: var(--accent); }
-  header .right.v1 .vl { flex-direction: column; align-items: center; }
-  header .right.v1 .v { font-size: 18px; }
-  header .right.v1 .l { margin-top: 1px; }
-  /* v2 — крупные цифры, подпись сверху */
-  header .right.v2 { align-items: center; }
-  header .right.v2 .stat { flex-direction: column; align-items: flex-start; gap: 4px; padding: 0 22px; border-left: 1px solid rgba(232,197,71,.15); }
-  header .right.v2 .stat:first-child { border-left: none; }
-  header .right.v2 .vl { flex-direction: column; align-items: flex-start; gap: 3px; }
-  header .right.v2 .l { order: -1; font-size: 9px; }
-  header .right.v2 .v { font-size: 22px; line-height: 1; }
-  header .right.v2 .ubar { display: block; width: 22px; height: 2px; background: var(--accent); opacity: .75; }
-  /* v3 — пилюли с иконкой */
-  header .right.v3 { gap: 8px; align-items: center; }
-  header .right.v3 .stat { gap: 10px; background: rgba(232,197,71,.06); border: 1px solid rgba(232,197,71,.2); border-radius: 999px; padding: 5px 16px 5px 6px; }
-  header .right.v3 .ic { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(232,197,71,.13); color: var(--accent); }
-  header .right.v3 .vl { flex-direction: column; align-items: flex-start; line-height: 1.2; }
-  header .right.v3 .v { font-size: 16px; }
-  header .right.v3 .l { font-size: 9px; }
-  /* переключатель вариантов (тест) */
-  header .hv-switch { position: absolute; top: 6px; right: 8px; display: flex; gap: 3px; z-index: 5; }
-  header .hv-switch button { font-family: 'IBM Plex Mono', monospace; font-size: 10px; width: 20px; height: 18px; background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; line-height: 1; padding: 0; }
-  header .hv-switch button.on { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
+  header .left .hstats {
+    margin-top: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    color: var(--muted); line-height: 1.3;
+  }
+  header .left .hstats .v { color: var(--accent); font-weight: 600; }
+  header .left .hstats .v.mz { color: #c050ff; }
+  header .left .hstats .sep { color: #3a3f55; margin: 0 5px; }
 
   .layout { display: flex; flex: 1; min-height: 0; position: relative; }
   aside.left {
@@ -284,10 +252,8 @@
     header .gerb { height: 32px; margin-right: 0; }
     header h1 { font-size: 14px; white-space: normal; }
     header .left .label { font-size: 8px; letter-spacing: 1px; }
-    header .right { width: 100%; }
-    header .right > div { flex: 1; width: auto; min-width: 0; padding: 2px 2px; }
-    header .right .v { font-size: 13px; }
-    header .right .l { font-size: 7px; letter-spacing: .5px; }
+    header .left .hstats { font-size: 10px; margin-top: 3px; }
+    header .left .hstats .sep { margin: 0 3px; }
     #mobile-filters-btn {
       display: flex; align-items: center; justify-content: center;
       position: absolute; top: 10px; left: 10px; z-index: 1000;
@@ -313,47 +279,9 @@
   <div class="left">
     <div class="label">КАДАСТРОВАЯ КАРТА</div>
     <h1>Херсонская область</h1>
-  </div>
-  <div class="right v0" id="hstats">
-    <div class="stat">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.7-6-10a6 6 0 0 1 12 0c0 4.3-6 10-6 10z"/><circle cx="12" cy="11" r="2.4"/></svg></span>
-      <span class="vl"><span class="v" id="hstat-parcels">0</span><span class="l">участков</span></span>
-      <span class="ubar"></span>
-    </div>
-    <div class="stat">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-4 8 5-2 11-9 2-5-3z"/><path d="M12 3v18"/></svg></span>
-      <span class="vl"><span class="v" id="hstat-area">0</span><span class="l">га</span></span>
-      <span class="ubar"></span>
-    </div>
-    <div class="stat">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l5-3 5 3v13"/><path d="M14 21V11l5-3v13"/><path d="M3 21h18"/></svg></span>
-      <span class="vl"><span class="v" id="hstat-councils">0</span><span class="l">сельсоветов</span></span>
-      <span class="ubar"></span>
-    </div>
-  </div>
-  <div class="hv-switch" role="group" aria-label="Вариант шапки">
-    <button type="button" data-hv="v0" title="Текущий">—</button>
-    <button type="button" data-hv="v1" title="Карточки">1</button>
-    <button type="button" data-hv="v2" title="Крупные цифры">2</button>
-    <button type="button" data-hv="v3" title="Пилюли">3</button>
+    <div class="hstats" id="hstats"><span class="v" id="hstat-parcels">0</span> участков<span class="sep">·</span><span class="v" id="hstat-area">0</span> га<span class="sep">·</span><span class="v" id="hstat-councils">0</span> советов<span class="sep">·</span><span class="v" id="hstat-raions">0</span> районов<span class="sep">·</span><span class="v mz" id="hstat-mz">0</span> размежёвано</div>
   </div>
 </header>
-<script>
-(function(){
-  function setHV(v){
-    var r=document.getElementById('hstats'); if(!r) return;
-    r.className='right '+v;
-    var bs=document.querySelectorAll('.hv-switch button');
-    for(var i=0;i<bs.length;i++) bs[i].classList.toggle('on', bs[i].getAttribute('data-hv')===v);
-    try{localStorage.setItem('kh_hv',v);}catch(e){}
-  }
-  var saved='v0'; try{saved=localStorage.getItem('kh_hv')||'v0';}catch(e){}
-  document.addEventListener('click',function(e){
-    var b=e.target.closest && e.target.closest('.hv-switch button'); if(b) setHV(b.getAttribute('data-hv'));
-  });
-  setHV(saved);
-})();
-</script>
 
 <div class="layout">
   <button id="mobile-filters-btn" type="button" aria-label="Фильтры" title="Фильтры">☰</button>
@@ -1190,6 +1118,8 @@ function renderSidebar() {
   document.getElementById('hstat-parcels').textContent = STATS.total_parcels.toLocaleString('ru');
   document.getElementById('hstat-area').textContent = STATS.total_area.toLocaleString('ru');
   document.getElementById('hstat-councils').textContent = STATS.councils;
+  document.getElementById('hstat-raions').textContent = new Set(COUNCILS.map(c => raionOf(c.code)).filter(Boolean)).size;
+  document.getElementById('hstat-mz').textContent = COUNCILS.reduce((s, c) => s + (MZ_COUNT[c.code] || 0), 0).toLocaleString('ru');
 
   // Filter dropdowns
   const fr = document.getElementById('filter-renter');
