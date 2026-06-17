@@ -257,7 +257,7 @@
 <div class="layout">
   <aside class="left">
     <div class="filter-group">
-      <label style="white-space:nowrap">Поиск (кадастр, ФИО, компания)</label>
+      <label style="white-space:nowrap">Поиск (село, кадастр, ФИО)</label>
       <input id="search" type="text" placeholder="напр. 90:01:0101015:1234" autocomplete="off"/>
       <div id="search-results"></div>
     </div>
@@ -1190,6 +1190,18 @@ document.getElementById('btn-reset').addEventListener('click', () => {
 const search = document.getElementById('search');
 const sr = document.getElementById('search-results');
 
+// Открыть село и подогнать его контуры на весь экран (учитывая правую панель)
+async function focusCouncil(code) {
+  showDetail(code);
+  const layer = await loadCouncilPolygons(code);
+  if (layer && layer.getLayers().length) {
+    map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [300, 40] });
+  } else {
+    const c = COUNCILS.find(x => x.code === code);
+    if (c && c.lat) map.flyTo([c.lat, c.lon], 13, { duration: 0.6 });
+  }
+}
+
 // Highlight a specific parcel polygon: pan and bring popup up
 async function navigateToParcel(cadnum) {
   const rada = cadnum.slice(0, 10);
@@ -1262,8 +1274,7 @@ search.addEventListener('input', e => {
     sr.querySelectorAll('.item').forEach((el,i) => {
       el.addEventListener('click', () => {
         const c = matches[i];
-        map.flyTo([c.lat, c.lon], 13, { duration: 0.6 });
-        showDetail(c.code);
+        focusCouncil(c.code);
         sr.style.display = 'none';
       });
     });
@@ -1314,8 +1325,7 @@ search.addEventListener('input', e => {
     el.addEventListener('click', () => {
       const r = results[i];
       if (r.type === 'council') {
-        map.flyTo([r.council.lat, r.council.lon], 13, { duration: 0.6 });
-        showDetail(r.council.code);
+        focusCouncil(r.council.code);
       } else {
         navigateToParcel(r.p.c);
       }
