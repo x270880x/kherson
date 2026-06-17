@@ -246,7 +246,7 @@
   <aside class="left">
     <div class="filter-group">
       <label>Поиск (кадастр UA/РФ, ФИО/компания)</label>
-      <input id="search" type="text" placeholder="напр. 6523884500, 90:01:0101015:1234 или АГРОДОМ" autocomplete="off"/>
+      <input id="search" type="text" placeholder="" autocomplete="off"/>
       <div id="search-results"></div>
     </div>
 
@@ -270,13 +270,6 @@
     </div>
 
     <div class="filter-group">
-      <label>Регион</label>
-      <select id="filter-region">
-        <option value="">— все —</option>
-      </select>
-    </div>
-
-    <div class="filter-group">
       <label>Размежевание (RU кадастр)</label>
       <select id="filter-mz">
         <option value="">— любые —</option>
@@ -285,23 +278,6 @@
       </select>
     </div>
 
-    <div class="filter-group">
-      <label>Год окончания договора</label>
-      <select id="filter-lease-year">
-        <option value="">— любой —</option>
-        <option value="expired">просрочен (до 2026)</option>
-        <option value="2026">2026</option>
-        <option value="2027">2027</option>
-        <option value="2028">2028</option>
-        <option value="2029">2029</option>
-        <option value="2030">2030</option>
-        <option value="2030+">2030 и позже</option>
-        <option value="none">нет договора</option>
-      </select>
-    </div>
-
-    <button class="btn-export" id="btn-export-all">📥 Выгрузить в Excel</button>
-    <button class="btn-reset" id="btn-toggle-polys" style="background:transparent;color:var(--blue);border-color:var(--blue);margin-bottom:6px">⌘ Контуры участков</button>
     <button class="btn-reset" id="btn-reset">Сбросить фильтры</button>
 
     <div style="height: 16px"></div>
@@ -316,12 +292,6 @@
     </div>
 
     <div style="height: 16px"></div>
-
-    <div class="stats-block">
-      <h3>Все арендаторы (<span id="renters-count">0</span>) <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;float:right">клик = фильтр</span></h3>
-      <input id="renters-search" type="text" placeholder="фильтр по имени…" style="width:100%;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px;font-family:inherit;font-size:11px;margin-bottom:8px"/>
-      <div id="top-renters" style="max-height:380px;overflow-y:auto"></div>
-    </div>
 
     <div class="stats-block">
       <h3>Форма собственности</h3>
@@ -982,6 +952,7 @@ function renderRentersList(query) {
     ? STATS.top_renters.filter(([k,_]) => k.toLowerCase().includes(q))
     : STATS.top_renters;
   const tr = document.getElementById('top-renters');
+  if (!tr) return;   // блок «Все арендаторы» убран из меню
   document.getElementById('renters-count').textContent = list.length + (q ? ` / ${STATS.top_renters.length}` : '');
   tr.innerHTML = list.map(([k,v])=>`
     <div class="bar-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:5px 0;font-size:11px;cursor:pointer;border-bottom:1px dotted var(--border);line-height:1.35" onclick="selectRenter(${JSON.stringify(k)})">
@@ -1032,8 +1003,6 @@ function renderSidebar() {
     const short = r.length > 60 ? r.slice(0,57)+'…' : r;
     fc.add(new Option(short, r));
   });
-  const frg = document.getElementById('filter-region');
-  (FILTERS.regions || []).forEach(r => frg.add(new Option(r, r)));
 }
 
 function selectRenter(name) {
@@ -1053,23 +1022,11 @@ document.getElementById('filter-category').addEventListener('change', e => {
   buildMarkers();
   if (activeCode) showDetail(activeCode);
 });
-document.getElementById('filter-region').addEventListener('change', e => {
-  filterRegion = e.target.value;
-  buildMarkers();
-  if (activeCode) showDetail(activeCode);
-});
-document.getElementById('filter-lease-year').addEventListener('change', e => {
-  filterLeaseYear = e.target.value;
-  buildMarkers();
-  if (activeCode) showDetail(activeCode);
-});
 document.getElementById('filter-mz').addEventListener('change', e => {
   filterMz = e.target.value;
   buildMarkers();
   if (activeCode) showDetail(activeCode);
 });
-document.getElementById('btn-export-all').addEventListener('click', exportFiltered);
-document.getElementById('btn-toggle-polys').addEventListener('click', togglePolygons);
 
 // ── 🛒 Корзина участков ──
 const basket = new Set();
@@ -1167,8 +1124,6 @@ document.getElementById('btn-reset').addEventListener('click', () => {
   document.getElementById('filter-renter').value = '';
   document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
   document.getElementById('filter-category').value = '';
-  document.getElementById('filter-region').value = '';
-  document.getElementById('filter-lease-year').value = '';
   document.getElementById('search').value = '';
   document.getElementById('search-results').style.display = 'none';
   buildMarkers();
@@ -1315,7 +1270,6 @@ document.addEventListener('click', e => {
 });
 
 renderSidebar();
-document.getElementById('renters-search').addEventListener('input', e => renderRentersList(e.target.value));
 document.getElementById('detail-close').addEventListener('click', () => {
   document.querySelector('aside.right').classList.remove('open');  // свернуть панель
 });
