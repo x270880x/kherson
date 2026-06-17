@@ -43,11 +43,11 @@
     color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
   }
   header h1 { font-size: 17px; font-weight: 700; color: #fff; }
-  header .right { display: flex; gap: 13px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; }
-  header .right .v { color: var(--accent); font-weight: 600; }
-  header .right .l { color: var(--muted); font-size: 7px; text-transform: uppercase; letter-spacing: 1px; }
-  header .right.filtered { margin-left: auto; font-size: 11px; }
-  header .right.filtered .l { font-size: 8px; }
+  header .right { display: flex; align-items: stretch; font-family: 'IBM Plex Mono', monospace; }
+  header .right > div { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 120px; padding: 2px 8px; border-left: 1px solid var(--border); box-sizing: border-box; }
+  header .right > div:first-child { border-left: none; }
+  header .right .v { color: var(--accent); font-weight: 600; font-size: 15px; line-height: 1.1; }
+  header .right .l { color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 3px; }
 
   .layout { display: flex; flex: 1; min-height: 0; position: relative; }
   aside.left {
