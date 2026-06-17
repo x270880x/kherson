@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
 <meta name="referrer" content="no-referrer">
-<title>Кадастровая карта — Херсонська область</title>
+<title>Кадастровая карта — Херсонская область</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -229,7 +229,7 @@
 <header>
   <div class="left">
     <div class="label">КАДАСТРОВАЯ КАРТА</div>
-    <h1>Херсонська область</h1>
+    <h1>Херсонская область</h1>
   </div>
   <div class="right">
     <div><div class="v" id="hstat-parcels">0</div><div class="l">участков</div></div>
@@ -351,6 +351,15 @@ const COUNCILS = DATA.councils.filter(c => c.region === ONLY_REGION);
 const STATS = DATA.stats;
 const FILTERS = DATA.filters;
 const RENTER_COUNCILS = DATA.renter_councils || {};
+
+// Перевод форм собственности на русский — только для отображения (исходные данные не меняем)
+const OWNERSHIP_RU = {
+  'Приватна власність': 'Частная собственность',
+  'Комунальна власність': 'Коммунальная собственность',
+  'Державна власність': 'Государственная собственность',
+  'Не визначено': 'Не определено'
+};
+const ruOwn = s => OWNERSHIP_RU[s] || s;
 
 // Пересчитать заголовочную статистику по сводкам только херсонских советов,
 // чтобы панель цифр совпадала с тем, что показано на карте.
@@ -727,7 +736,7 @@ async function showDetail(code) {
       <div class="bar-list">
         ${ownership.map(([k,v])=>`
           <div class="bar-row">
-            <span class="name">${k}</span>
+            <span class="name">${ruOwn(k)}</span>
             <span class="count">${v}</span>
           </div>
         `).join('')}
@@ -989,7 +998,7 @@ function renderSidebar() {
   const os = document.getElementById('ownership-split');
   os.innerHTML = Object.entries(STATS.ownership_split).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
     <div class="bar-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:4px 0;font-size:11px;line-height:1.35">
-      <span class="name" style="flex:1;color:var(--text);word-break:break-word">${escapeHtml(k)}</span>
+      <span class="name" style="flex:1;color:var(--text);word-break:break-word">${escapeHtml(ruOwn(k))}</span>
       <span class="count" style="font-family:'IBM Plex Mono',monospace;color:var(--accent);min-width:36px;text-align:right;flex-shrink:0">${v}</span>
     </div>
   `).join('');
@@ -1006,7 +1015,7 @@ function renderSidebar() {
   fo.innerHTML = FILTERS.ownership.map((r,i)=>`
     <label style="display:flex;align-items:flex-start;gap:6px;padding:4px 0;cursor:pointer;line-height:1.3;font-size:11px;color:var(--text);text-transform:none;letter-spacing:0;font-weight:400;margin:0">
       <input type="checkbox" value="${escapeHtml(r)}" data-ownership style="margin:1px 0 0 0;flex-shrink:0;width:13px;height:13px;accent-color:var(--accent)"/>
-      <span style="flex:1;min-width:0;word-break:break-word;overflow-wrap:anywhere">${escapeHtml(r)}</span>
+      <span style="flex:1;min-width:0;word-break:break-word;overflow-wrap:anywhere">${escapeHtml(ruOwn(r))}</span>
     </label>
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
