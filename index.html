@@ -45,6 +45,7 @@
   header .right { display: flex; gap: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
   header .right .v { color: var(--accent); font-weight: 600; }
   header .right .l { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+  header .right.filtered { margin-left: auto; }
 
   .layout { display: flex; flex: 1; min-height: 0; }
   aside.left {
@@ -222,6 +223,8 @@
     <div><div class="v" id="hstat-parcels">0</div><div class="l">участков</div></div>
     <div><div class="v" id="hstat-area">0</div><div class="l">га</div></div>
     <div><div class="v" id="hstat-councils">0</div><div class="l">сельсоветов</div></div>
+  </div>
+  <div class="right filtered">
     <div><div class="v" id="hstat-filtered">—</div><div class="l">отфильтр. участков</div></div>
     <div><div class="v" id="hstat-filtered-area">—</div><div class="l">отфильтр. га</div></div>
   </div>
