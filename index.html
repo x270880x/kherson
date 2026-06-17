@@ -1150,7 +1150,7 @@ function renderSidebar() {
   document.getElementById('hstat-parcels').textContent = STATS.total_parcels.toLocaleString('ru');
   document.getElementById('hstat-area').textContent = STATS.total_area.toLocaleString('ru');
   document.getElementById('hstat-councils').textContent = STATS.councils;
-  document.getElementById('hstat-raions').textContent = new Set(COUNCILS.map(c => raionOf(c.code)).filter(r => r && r.includes('район'))).size;
+  document.getElementById('hstat-raions').textContent = 20;  // официальное деление РФ (Указ 2023): 20 районов области (в данных представлены 17)
   document.getElementById('hstat-mz').textContent = COUNCILS.reduce((s, c) => s + (MZ_COUNT[c.code] || 0), 0).toLocaleString('ru');
 
   // Filter dropdowns
