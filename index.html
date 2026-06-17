@@ -778,7 +778,7 @@ function buildMarkers() {
     m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       direction: 'top', offset: [0, -sz/2], opacity: 0.95
     });
-    m.on('click', () => focusCouncil(c.code, Math.log2(1.7)));  // клик по селу → приблизить к участкам ×1.7
+    m.on('click', () => focusCouncil(c.code, Math.log2(1.5)));  // клик по селу → плавно приблизить к участкам ×1.5
     markers[c.code] = m;
   });
   restyleFilteredPolygons();
@@ -1380,12 +1380,17 @@ async function focusCouncil(code, closer = 0) {
   const layer = await loadCouncilPolygons(code);
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
   if (layer && layer.getLayers().length) {
-    // animate:false — без анимации зума, чтобы тёмная схема не мерцала светлым
-    map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: isMobile ? [40, 40] : [300, 40], animate: false });
-    if (closer) map.setZoom(Math.min(map.getMaxZoom(), map.getZoom() + closer), { animate: false });  // ×1.7 ближе (closer = log2 кратности)
+    // Плавное приближение одним движением (flyTo): целевой зум = вписать участки + доп. кратность (closer = log2)
+    const bounds = layer.getBounds();
+    const padTL = L.point(40, 40);
+    const padBR = L.point(isMobile ? 40 : 300, 40);
+    let z = Math.min(map.getMaxZoom(), map.getBoundsZoom(bounds, false, padTL.add(padBR)) + closer);
+    // центр со сдвигом под асимметричные отступы (правая панель на десктопе)
+    const cPt = map.project(bounds.getCenter(), z).add(L.point((padBR.x - padTL.x) / 2, (padBR.y - padTL.y) / 2));
+    map.flyTo(map.unproject(cPt, z), z, { duration: 0.6 });
   } else {
     const c = COUNCILS.find(x => x.code === code);
-    if (c && c.lat) map.setView([c.lat, c.lon], 13 + closer, { animate: false });
+    if (c && c.lat) map.flyTo([c.lat, c.lon], 13 + closer, { duration: 0.6 });
   }
 }
 
@@ -1415,7 +1420,7 @@ async function navigateToParcel(cadnum) {
   if (target) {
     // Zoom to parcel + open popup
     const b = target.getBounds();
-    map.fitBounds(b, { padding: [60, 60], maxZoom: 18, animate: false });
+    map.fitBounds(b, { padding: [60, 60], maxZoom: 18, animate: true, duration: 0.6 });
     const pdata = (council.parcels || []).find(p => p.c === cadnum);
     target.bindPopup(buildParcelPopup(cadnum, pdata, council));
     setTimeout(() => target.openPopup(), 600);
