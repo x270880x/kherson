@@ -249,10 +249,6 @@
     <div><div class="v" id="hstat-area">0</div><div class="l">га</div></div>
     <div><div class="v" id="hstat-councils">0</div><div class="l">сельсоветов</div></div>
   </div>
-  <div class="right filtered">
-    <div><div class="v" id="hstat-filtered">—</div><div class="l">отфильтр. уч.</div></div>
-    <div><div class="v" id="hstat-filtered-area">—</div><div class="l">отфильтр. га</div></div>
-  </div>
 </header>
 
 <div class="layout">
@@ -712,9 +708,6 @@ function buildMarkers() {
     });
     markers[c.code] = m;
   });
-
-  document.getElementById('hstat-filtered').textContent      = hasFilter ? fmt(totalCount) : '—';
-  document.getElementById('hstat-filtered-area').textContent = hasFilter ? fmt(Math.round(totalArea * 10) / 10) : '—';
 }
 
 async function showDetail(code) {
