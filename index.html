@@ -772,10 +772,7 @@ function buildMarkers() {
     m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       direction: 'top', offset: [0, -sz/2], opacity: 0.95
     });
-    m.on('click', () => {
-      showDetail(c.code);
-      loadCouncilPolygons(c.code);  // ленивая подгрузка контуров
-    });
+    m.on('click', () => focusCouncil(c.code, 1));  // клик по селу → приблизить к участкам ×2
     markers[c.code] = m;
   });
   restyleFilteredPolygons();
@@ -1370,15 +1367,17 @@ const search = document.getElementById('search');
 const sr = document.getElementById('search-results');
 
 // Открыть село и подогнать его контуры на весь экран (учитывая правую панель)
-async function focusCouncil(code) {
+async function focusCouncil(code, closer = 0) {
   showDetail(code);
   const layer = await loadCouncilPolygons(code);
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
   if (layer && layer.getLayers().length) {
     // animate:false — без анимации зума, чтобы тёмная схема не мерцала светлым
-    map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [300, 40], animate: false });
+    map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: isMobile ? [40, 40] : [300, 40], animate: false });
+    if (closer) map.setZoom(Math.min(map.getMaxZoom(), map.getZoom() + closer), { animate: false });  // ×2 ближе
   } else {
     const c = COUNCILS.find(x => x.code === code);
-    if (c && c.lat) map.setView([c.lat, c.lon], 13, { animate: false });
+    if (c && c.lat) map.setView([c.lat, c.lon], 13 + closer, { animate: false });
   }
 }
 
