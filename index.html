@@ -491,7 +491,7 @@ function buildParcelPopup(cad, data, council) {
       ${data.r ? `<div><b style="color:#aaa">аренд.:</b> ${data.r}</div>` : ''}
       ${data.o ? `<div><b style="color:#aaa">собств.:</b> ${data.o}</div>` : ''}
       ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
-      ${data.ot ? `<div style="color:#aaa;font-size:10px;margin-top:4px">${data.ot}</div>` : ''}
+      ${data.ot ? `<div style="color:${ownColor(data.ot)};font-size:10px;margin-top:4px">${data.ot}</div>` : ''}
       ${data.mz ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(192,80,255,0.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff;margin-top:2px">${data.mz}</div><div style="color:#aaa;font-size:10px;margin-top:2px">${data.mzmo}${data.mzp?` · передача: ${data.mzp}`:''}</div></div>` : ''}
       ${basketBtn}
     </div>`;
@@ -725,7 +725,7 @@ async function showDetail(code) {
       <div class="bar-list">
         ${ownership.map(([k,v])=>`
           <div class="bar-row">
-            <span class="name">${ruOwn(k)}</span>
+            <span class="name" style="color:${ownColor(k)}"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${ownColor(k)};margin-right:6px;vertical-align:middle"></span>${ruOwn(k)}</span>
             <span class="count">${v}</span>
           </div>
         `).join('')}
