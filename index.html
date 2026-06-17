@@ -364,11 +364,24 @@ function nameParts(name) {
   const pm = ua.match(/^(с\.|смт|м\.|пгт|с-ще)\s+/i);
   return { ru: (pm ? pm[0] : '') + m[2].trim(), ua };
 }
-function nameH2(name) {
-  const p = nameParts(name);
-  return p.ua
-    ? `${escapeHtml(p.ru)}<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px">${escapeHtml(p.ua)}</span>`
-    : escapeHtml(p.ru);
+// Район РФ по префиксу кадастрового кода (позиции 3-5), получен геокодированием координатов советов
+const RAION_BY_PREFIX = {
+  "101":"Херсонский район","104":"Каховский район","107":"Каховский район",
+  "201":"Херсонский район","203":"Херсонский район","206":"Бериславский район",
+  "209":"Бериславский район","211":"Генический район","212":"Каховский район",
+  "215":"Каховский район","221":"Генический район","223":"Скадовский район",
+  "226":"Каховский район","229":"Генический район","232":"Скадовский район",
+  "235":"Каховский район","238":"Генический район","241":"Бериславский район",
+  "244":"Генический район","247":"Скадовский район","250":"Херсонский район",
+  "254":"Каховский район"
+};
+const raionOf = code => RAION_BY_PREFIX[(code || '').slice(2, 5)] || '';
+
+// Заголовок детали: русское название крупно + «район (укр. название)» мелким снизу
+function detailTitle(c) {
+  const p = nameParts(c.name);
+  const sub = [raionOf(c.code), p.ua ? `(${p.ua})` : ''].filter(Boolean).join(' ');
+  return `${escapeHtml(p.ru)}${sub ? `<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px">${escapeHtml(sub)}</span>` : ''}`;
 }
 
 // Пересчитать заголовочную статистику по сводкам только херсонских советов,
@@ -712,7 +725,7 @@ async function showDetail(code) {
     det.innerHTML = `
       <div class="detail-header">
         <div class="code">${c.code}</div>
-        <h2>${nameH2(c.name)}</h2>
+        <h2>${detailTitle(c)}</h2>
         <div class="meta"><span>${c.total} участков</span><span>${c.area.toLocaleString('ru')} га</span></div>
       </div>
       <div style="padding:16px;color:var(--muted);font-size:12px">Загружаю участки…</div>
@@ -735,7 +748,7 @@ async function showDetail(code) {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1">
           <div class="code">${c.code}</div>
-          <h2>${nameH2(c.name)}</h2>
+          <h2>${detailTitle(c)}</h2>
           <div class="meta">
             <span>${c.total} участков</span>
             <span>${c.area.toLocaleString('ru')} га</span>
