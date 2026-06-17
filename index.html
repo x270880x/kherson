@@ -336,6 +336,15 @@ const OWN_COLOR = {
 };
 const ownColor = s => OWN_COLOR[s] || '#e05252';
 
+// Короткие подписи форм собственности (в 1 строку)
+const OWN_SHORT = {
+  'Приватна власність': 'Частная',
+  'Комунальна власність': 'Комм.',
+  'Державна власність': 'Гос.',
+  'Не визначено': 'Не опр.'
+};
+const ruOwnShort = s => OWN_SHORT[s] || ruOwn(s).replace(' собственность', '');
+
 // Пересчитать заголовочную статистику по сводкам только херсонских советов,
 // чтобы панель цифр совпадала с тем, что показано на карте.
 (function restrictStatsToRegion() {
@@ -713,9 +722,9 @@ async function showDetail(code) {
       <h4>Форма собственности</h4>
       <div style="display:flex;justify-content:space-between;gap:6px">
         ${ownership.map(([k,v])=>`
-          <div style="flex:1;min-width:0;text-align:center;border-top:2px solid ${ownColor(k)};padding-top:4px">
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:${ownColor(k)}">${fmt(v)}</div>
-            <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;line-height:1.25;margin-top:2px;overflow-wrap:anywhere">${ruOwn(k).replace(' собственность','')}</div>
+          <div style="flex:1;min-width:0;text-align:center;border-top:2px solid ${ownColor(k)};padding-top:3px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${ownColor(k)}">${fmt(v)}</div>
+            <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;line-height:1.2;margin-top:1px;white-space:nowrap">${ruOwnShort(k)}</div>
           </div>
         `).join('')}
       </div>
