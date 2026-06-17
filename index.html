@@ -1218,15 +1218,16 @@ function renderBasketPanel() {
   const CAP = 300, shown = items.slice(0, CAP);
   // индекс площадей по советам (каждый совет индексируется один раз)
   const idxCache = {};
-  const areaOf = cad => {
+  const recOf = cad => {
     const code = cad.slice(0, 10);
     if (!idxCache[code]) {
       const c = COUNCILS.find(x => x.code === code);
-      const idx = {}; ((c && c.parcels) || []).forEach(p => idx[p.c] = p.a);
+      const idx = {}; ((c && c.parcels) || []).forEach(p => idx[p.c] = p);
       idxCache[code] = idx;
     }
     return idxCache[code][cad];
   };
+  const areaOf = cad => { const r = recOf(cad); return r ? r.a : undefined; };
   let totalArea = 0;
   items.forEach(cad => { const a = areaOf(cad); if (a != null) totalArea += a; });
   const totalStr = totalArea.toLocaleString('ru', { maximumFractionDigits: 1 });
@@ -1243,9 +1244,9 @@ function renderBasketPanel() {
     </div>
     <div class="detail-section">
       <div class="bar-list" style="max-height:none">
-        ${items.length ? shown.map(cad => { const a = areaOf(cad); return `
+        ${items.length ? shown.map(cad => { const r = recOf(cad); const a = r ? r.a : undefined; const col = r && r.ot ? ownColor(r.ot) : 'var(--text)'; return `
           <div class="bar-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border)">
-            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text);word-break:break-all">${cad}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${col};word-break:break-all">${cad}</span>
             <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);flex-shrink:0;margin-left:auto">${a != null ? a + ' га' : '—'}</span>
             <button onclick="basketToggle('${cad}')" title="убрать" style="background:none;border:none;color:#e05252;cursor:pointer;font-size:14px;flex-shrink:0;line-height:1">✕</button>
           </div>`; }).join('') + (items.length > CAP ? `<div style="color:var(--muted);font-size:11px;padding:8px 0">…и ещё ${items.length - CAP}. Полный список — в выгрузке Excel.</div>` : '') : '<div style="color:var(--muted);font-size:12px;padding:8px 0">Подборка пуста</div>'}
