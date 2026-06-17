@@ -547,6 +547,10 @@ async function loadCouncilPolygons(code) {
 function parcelStyle(f, council) {
   const cad = f.properties.cadnum;
   const data = council ? council.parcels.find(p => p.c === cad) : null;
+  // При активном фильтре показываем только подходящие участки, остальные прячем
+  if (hasAnyFilter() && !(data && parcelMatchesFilters(data, council ? council.region : ''))) {
+    return { stroke: false, fill: false };
+  }
   let fill = '#888';
   if (data) {
     fill = ownColor(data.ot);
@@ -555,9 +559,21 @@ function parcelStyle(f, council) {
   }
   // Межевание сделано → толстая фиолетовая обводка
   if (data && data.mz) {
-    return { fillColor: fill, color: '#c050ff', weight: 2.5, fillOpacity: 0.6 };
+    return { stroke: true, fill: true, fillColor: fill, color: '#c050ff', weight: 2.5, fillOpacity: 0.6 };
   }
-  return { fillColor: fill, color: '#1a1a1a', weight: 0.6, fillOpacity: 0.5 };
+  return { stroke: true, fill: true, fillColor: fill, color: '#1a1a1a', weight: 0.6, fillOpacity: 0.5 };
+}
+
+// Перерисовать полигоны загруженных сёл под текущий фильтр (скрыть неподходящие)
+function restyleFilteredPolygons() {
+  for (const code in polygonLayers) {
+    const layer = polygonLayers[code];
+    const council = COUNCILS.find(c => c.code === code);
+    layer.eachLayer(l => {
+      if (basket.has(l.feature.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7, stroke:true, fill:true });
+      else l.setStyle(parcelStyle(l.feature, council));
+    });
+  }
 }
 
 function buildParcelPopup(cad, data, council) {
@@ -760,6 +776,7 @@ function buildMarkers() {
     });
     markers[c.code] = m;
   });
+  restyleFilteredPolygons();
 }
 
 async function showDetail(code) {
@@ -1352,10 +1369,11 @@ async function focusCouncil(code) {
   showDetail(code);
   const layer = await loadCouncilPolygons(code);
   if (layer && layer.getLayers().length) {
-    map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [300, 40] });
+    // animate:false — без анимации зума, чтобы тёмная схема не мерцала светлым
+    map.fitBounds(layer.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [300, 40], animate: false });
   } else {
     const c = COUNCILS.find(x => x.code === code);
-    if (c && c.lat) map.flyTo([c.lat, c.lon], 13, { duration: 0.6 });
+    if (c && c.lat) map.setView([c.lat, c.lon], 13, { animate: false });
   }
 }
 
@@ -1385,7 +1403,7 @@ async function navigateToParcel(cadnum) {
   if (target) {
     // Zoom to parcel + open popup
     const b = target.getBounds();
-    map.fitBounds(b, { padding: [60, 60], maxZoom: 18 });
+    map.fitBounds(b, { padding: [60, 60], maxZoom: 18, animate: false });
     const pdata = (council.parcels || []).find(p => p.c === cadnum);
     target.bindPopup(buildParcelPopup(cadnum, pdata, council));
     setTimeout(() => target.openPopup(), 600);
