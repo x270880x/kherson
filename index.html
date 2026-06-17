@@ -292,12 +292,6 @@
       <div style="color:var(--muted);font-size:10px;margin-top:6px">Клик по полигону на карте — тоже добавит/уберёт</div>
     </div>
 
-    <div style="height: 16px"></div>
-
-    <div class="stats-block">
-      <h3>Форма собственности</h3>
-      <div id="ownership-split"></div>
-    </div>
   </aside>
 
   <div id="map"></div>
@@ -991,7 +985,7 @@ function renderSidebar() {
 
   // Ownership split
   const os = document.getElementById('ownership-split');
-  os.innerHTML = Object.entries(STATS.ownership_split).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+  if (os) os.innerHTML = Object.entries(STATS.ownership_split).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
     <div class="bar-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:4px 0;font-size:11px;line-height:1.35">
       <span class="name" style="flex:1;color:var(--text);word-break:break-word">${escapeHtml(ruOwn(k))}</span>
       <span class="count" style="font-family:'IBM Plex Mono',monospace;color:var(--accent);min-width:36px;text-align:right;flex-shrink:0">${v}</span>
@@ -1014,6 +1008,7 @@ function renderSidebar() {
       <input type="checkbox" value="${escapeHtml(r)}" data-ownership style="margin:0;flex-shrink:0;width:13px;height:13px;accent-color:${ownColor(r)}"/>
       <span style="width:10px;height:10px;border-radius:2px;background:${ownColor(r)};flex-shrink:0"></span>
       <span style="flex:1;min-width:0;word-break:break-word;overflow-wrap:anywhere;color:${ownColor(r)}">${escapeHtml(ruOwn(r))}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:10px;flex-shrink:0">${fmt(STATS.ownership_split[r] || 0)}</span>
     </label>
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
