@@ -357,13 +357,16 @@ const OWN_SHORT = {
 };
 const ruOwnShort = s => OWN_SHORT[s] || ruOwn(s).replace(' собственность', '');
 
-// Название села: русское (из скобок, крупно) + украинское мелким снизу
+// Название села: русское (из скобок, крупно) + украинское мелким снизу.
+// Префикс типа НП переводим на русский: смт→пгт, м.→г. («с.»/«х.» одинаковы).
+const PREFIX_RU = { 'смт': 'пгт', 'м.': 'г.' };
 function nameParts(name) {
   const m = (name || '').match(/^(.*?)\s*\(([^)]+)\)\s*$/);
   if (!m) return { ru: name || '', ua: '' };
   const ua = m[1].trim();
-  const pm = ua.match(/^(с\.|смт|м\.|пгт|с-ще)\s+/i);
-  return { ru: (pm ? pm[0] : '') + m[2].trim(), ua };
+  const pm = ua.match(/^(смт|пгт|с\.|х\.|м\.)\s+/i);
+  const pre = pm ? ((PREFIX_RU[pm[1].toLowerCase()] || pm[1]) + ' ') : '';
+  return { ru: pre + m[2].trim(), ua };
 }
 // Район РФ по префиксу кадастрового кода (позиции 3-5), получен геокодированием координатов советов
 const RAION_BY_PREFIX = {
