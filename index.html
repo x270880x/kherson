@@ -766,7 +766,10 @@ async function showDetail(code) {
   activeCode = code;
   const c = COUNCILS.find(x => x.code === code);
   if (!c) return;
-  document.querySelector('aside.right').classList.add('open');  // выдвинуть панель
+  // На мобиле не открываем правую панель при выборе села — карта остаётся на весь экран
+  if (!window.matchMedia('(max-width: 768px)').matches) {
+    document.querySelector('aside.right').classList.add('open');  // выдвинуть панель
+  }
   document.getElementById('detail-reopen').classList.remove('show');
   basketView = false;   // клик по селу — выходим из режима подборки
   const det = document.getElementById('detail');
