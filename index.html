@@ -238,13 +238,40 @@
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
   /* Mobile */
-  @media (max-width: 900px) {
+  @media (max-width: 900px) and (min-width: 769px) {
     aside.left, aside.right { width: 220px; }
+  }
+  /* Кнопка фильтров — только на мобиле */
+  #mobile-filters-btn { display: none; }
+  @media (max-width: 768px) {
+    /* Компактная шапка */
+    header { flex-wrap: wrap; gap: 6px 10px; padding: 7px 10px; }
+    header .gerb { height: 32px; margin-right: 0; }
+    header h1 { font-size: 14px; white-space: normal; }
+    header .left .label { font-size: 8px; letter-spacing: 1px; }
+    header .right { width: 100%; }
+    header .right > div { flex: 1; width: auto; min-width: 0; padding: 2px 2px; }
+    header .right .v { font-size: 13px; }
+    header .right .l { font-size: 7px; letter-spacing: .5px; }
+    #mobile-filters-btn {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: 32px; height: 32px; background: var(--surface2); color: var(--accent);
+      border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 18px; line-height: 1;
+    }
+    /* Карта на весь экран, фильтры — выезжающая шторка слева */
+    aside.left {
+      position: absolute; top: 0; bottom: 0; left: 0; width: 84%; max-width: 320px;
+      transform: translateX(-100%); transition: transform .25s ease;
+      z-index: 1200; box-shadow: 4px 0 18px rgba(0,0,0,.45);
+    }
+    aside.left.open { transform: translateX(0); }
+    aside.right { width: 90%; max-width: 340px; }
   }
 </style>
 </head>
 <body>
 <header>
+  <button id="mobile-filters-btn" type="button" aria-label="Фильтры" title="Фильтры">☰</button>
   <img class="gerb" src="gerb.svg" alt="Герб Херсонской области" title="Херсонская область"/>
   <div class="left">
     <div class="label">КАДАСТРОВАЯ КАРТА</div>
@@ -1472,6 +1499,13 @@ document.getElementById('detail-reopen').addEventListener('click', () => {
   document.querySelector('aside.right').classList.add('open');      // развернуть обратно
   document.getElementById('detail-reopen').classList.remove('show');
 });
+// Мобайл: кнопка ☰ открывает/закрывает шторку фильтров; тап по карте — закрывает
+const asideLeft = document.querySelector('aside.left');
+document.getElementById('mobile-filters-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  asideLeft.classList.toggle('open');
+});
+map.on('click', () => asideLeft.classList.remove('open'));
 buildMarkers();
 
 // Fit bounds to all councils
