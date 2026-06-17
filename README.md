@@ -1,2 +1,2 @@
-# kherson
-kherson
+# kadastr-nyzhni-sirohozy
+Кадастровая карта Нижнесерогозского района (приватная)
