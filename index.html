@@ -1183,17 +1183,30 @@ function renderSidebar() {
   });
 }
 
+// Плавно перетянуть карту к участкам выбранного арендатора (по советам, где он есть)
+function fitToRenter() {
+  if (!filterRenter) return;
+  let codes = RENTER_COUNCILS[filterRenter];
+  if (!codes || !codes.length) codes = COUNCILS.filter(c => (c.top_renters || []).some(([n]) => n === filterRenter)).map(c => c.code);
+  const set = new Set(codes);
+  const pts = COUNCILS.filter(c => c.lat && set.has(c.code)).map(c => [c.lat, c.lon]);
+  if (!pts.length) return;
+  map.flyToBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 12, duration: 0.6 });
+}
+
 function selectRenter(name) {
   document.getElementById('filter-renter').value = name;
   filterRenter = name;
   buildMarkers();
   if (activeCode) showDetail(activeCode);
+  fitToRenter();
 }
 
 document.getElementById('filter-renter').addEventListener('change', e => {
   filterRenter = e.target.value;
   buildMarkers();
   if (activeCode) showDetail(activeCode);
+  fitToRenter();
 });
 document.getElementById('filter-category').addEventListener('change', e => {
   filterCategory = e.target.value;
