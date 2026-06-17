@@ -211,8 +211,9 @@
   }
   .leaflet-popup-content { font-size: 12px; }
   .leaflet-popup-tip { background: var(--surface2); }
-  .leaflet-popup-content .pname { font-weight: 600; color: var(--accent); font-size: 13px; }
-  .leaflet-popup-content .pstats { margin-top: 4px; color: var(--muted); font-size: 11px; font-family: 'IBM Plex Mono', monospace; }
+  .leaflet-popup-content .pname, .leaflet-tooltip .pname { font-weight: 600; color: var(--accent); font-size: 15px; }
+  .leaflet-tooltip .praion { color: var(--muted); font-size: 9px; margin-top: 1px; }
+  .leaflet-popup-content .pstats, .leaflet-tooltip .pstats { margin-top: 4px; color: var(--muted); font-size: 11px; font-family: 'IBM Plex Mono', monospace; }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -528,7 +529,7 @@ function parcelStyle(f, council) {
 
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
-  const basketBtn = `<button onclick="basketToggle('${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e05252':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
+  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e05252':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
   if (!data) {
     return `<div style="font-size:12px;color:#e8c547"><div style="font-family:'IBM Plex Mono',monospace;font-weight:600">${cad}</div><div style="color:#aaa;font-size:11px">нет данных в базе</div>${basketBtn}</div>`;
   }
@@ -699,7 +700,7 @@ function buildMarkers() {
     const ttArea = hasFilter
       ? `${fmt(fs.area)} / ${fmt(c.area)} га`
       : `${fmt(c.area)} га`;
-    m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
+    m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       direction: 'top', offset: [0, -sz/2], opacity: 0.95
     });
     m.on('click', () => {
@@ -1119,6 +1120,13 @@ function basketToggle(cadnum) {
   if (basket.has(cadnum)) basket.delete(cadnum);
   else basket.add(cadnum);
   basketUpdate();
+}
+// Переключить подборку и обновить саму кнопку в попапе (текст + цвет)
+function toggleBasketBtn(btn, cadnum) {
+  basketToggle(cadnum);
+  const inB = basket.has(cadnum);
+  btn.textContent = inB ? '− убрать из подборки' : '+ в подборку';
+  btn.style.background = inB ? '#e05252' : 'var(--accent)';
 }
 document.getElementById('btn-basket-add').addEventListener('click', () => {
   const text = document.getElementById('basket-input').value || '';
