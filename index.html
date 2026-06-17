@@ -709,24 +709,24 @@ async function showDetail(code) {
       </div>
     </div>
 
+    <div class="detail-section" style="margin-top:10px">
+      <h4>Форма собственности</h4>
+      <div style="display:flex;justify-content:space-between;gap:6px">
+        ${ownership.map(([k,v])=>`
+          <div style="flex:1;min-width:0;text-align:center;border-top:2px solid ${ownColor(k)};padding-top:4px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:${ownColor(k)}">${fmt(v)}</div>
+            <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;line-height:1.25;margin-top:2px;overflow-wrap:anywhere">${ruOwn(k).replace(' собственность','')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
     <div class="detail-stats">
       ${hasFilter ? `
       <div class="row"><span class="k">По фильтру: участков</span><span class="v big" style="color:var(--blue)">${fmt(parcels.length)}</span></div>
       <div class="row"><span class="k">По фильтру: площадь</span><span class="v big" style="color:var(--blue)">${fmt(filteredArea)} га</span></div>
       <div class="row"><span class="k">Доля от сельсовета</span><span class="v">${c.area>0 ? ((filteredArea/c.area)*100).toFixed(1) : 0}%</span></div>
       ` : ''}
-    </div>
-
-    <div class="detail-section">
-      <h4>Форма собственности</h4>
-      <div class="bar-list">
-        ${ownership.map(([k,v])=>`
-          <div class="bar-row">
-            <span class="name" style="color:${ownColor(k)}"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${ownColor(k)};margin-right:6px;vertical-align:middle"></span>${ruOwn(k)}</span>
-            <span class="count">${v}</span>
-          </div>
-        `).join('')}
-      </div>
     </div>
 
     ${c.top_renters.length ? `
