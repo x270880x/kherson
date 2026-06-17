@@ -254,9 +254,11 @@
     header .right .v { font-size: 13px; }
     header .right .l { font-size: 7px; letter-spacing: .5px; }
     #mobile-filters-btn {
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      width: 32px; height: 32px; background: var(--surface2); color: var(--accent);
-      border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      position: absolute; top: 10px; left: 10px; z-index: 1000;
+      width: 34px; height: 34px; background: #fff; color: #333;
+      border: 2px solid rgba(0,0,0,.2); border-radius: 6px; cursor: pointer; font-size: 19px; line-height: 1;
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
     }
     /* Карта на весь экран, фильтры — выезжающая шторка слева */
     aside.left {
@@ -272,7 +274,6 @@
 </head>
 <body>
 <header>
-  <button id="mobile-filters-btn" type="button" aria-label="Фильтры" title="Фильтры">☰</button>
   <img class="gerb" src="gerb.svg" alt="Герб Херсонской области" title="Херсонская область"/>
   <div class="left">
     <div class="label">КАДАСТРОВАЯ КАРТА</div>
@@ -286,6 +287,7 @@
 </header>
 
 <div class="layout">
+  <button id="mobile-filters-btn" type="button" aria-label="Фильтры" title="Фильтры">☰</button>
   <aside class="left">
     <div class="filter-group">
       <label style="white-space:nowrap">Поиск (село, кадастр, ФИО)</label>
@@ -299,18 +301,18 @@
     </div>
 
     <div class="filter-group">
-      <label>Категория земель</label>
-      <select id="filter-category">
-        <option value="">— все —</option>
-      </select>
-    </div>
-
-    <div class="filter-group">
       <label>Размежевание (РФ кадастр)</label>
       <select id="filter-mz">
         <option value="">— любые —</option>
         <option value="yes">только размежёванные</option>
         <option value="no">только не размежёванные</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Категория земель (УКР)</label>
+      <select id="filter-category">
+        <option value="">— все —</option>
       </select>
     </div>
 
