@@ -1005,11 +1005,11 @@ function renderSidebar() {
   // «Не визначено» (Не определено) — всегда последним
   const ownOrdered = [...FILTERS.ownership].sort((a,b) => (a === 'Не визначено' ? 1 : 0) - (b === 'Не визначено' ? 1 : 0));
   fo.innerHTML = ownOrdered.map((r,i)=>`
-    <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;line-height:1.3;font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;margin:0">
+    <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;line-height:1.3;font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;margin:0">
       <input type="checkbox" value="${escapeHtml(r)}" data-ownership style="margin:0;flex-shrink:0;width:13px;height:13px;accent-color:${ownColor(r)}"/>
       <span style="width:10px;height:10px;border-radius:2px;background:${ownColor(r)};flex-shrink:0"></span>
       <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${ownColor(r)}">${escapeHtml(ruOwn(r).replace(' собственность',''))}</span>
-      <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:10px;flex-shrink:0">${fmt(STATS.ownership_split[r] || 0)}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px;flex-shrink:0">${fmt(STATS.ownership_split[r] || 0)}</span>
     </label>
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
