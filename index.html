@@ -42,21 +42,33 @@
     color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
   }
   header h1 { font-size: 17px; font-weight: 700; color: #fff; }
-  header .right { display: flex; gap: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  header .right { display: flex; gap: 13px; font-family: 'IBM Plex Mono', monospace; font-size: 9px; }
   header .right .v { color: var(--accent); font-weight: 600; }
-  header .right .l { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
+  header .right .l { color: var(--muted); font-size: 7px; text-transform: uppercase; letter-spacing: 1px; }
   header .right.filtered { margin-left: auto; }
 
-  .layout { display: flex; flex: 1; min-height: 0; }
+  .layout { display: flex; flex: 1; min-height: 0; position: relative; }
   aside.left {
     width: 280px; background: var(--surface); border-right: 1px solid var(--border);
     overflow-y: auto; padding: 16px;
     flex-shrink: 0;
   }
   aside.right {
-    width: 380px; background: var(--surface); border-left: 1px solid var(--border);
-    overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column;
+    position: absolute; top: 0; right: 0; bottom: 0; width: 280px; z-index: 1100;
+    background: var(--surface); border-left: 1px solid var(--border);
+    overflow-y: auto; display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform 0.25s ease;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.4);
   }
+  aside.right.open { transform: translateX(0); }
+  .detail-close {
+    position: sticky; top: 0; align-self: flex-end; flex-shrink: 0;
+    margin: 8px 8px 0; width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface2); color: var(--muted); border: 1px solid var(--border);
+    border-radius: 4px; cursor: pointer; font-size: 13px; line-height: 1;
+  }
+  .detail-close:hover { color: var(--text); border-color: var(--accent); }
   #map { flex: 1; background: #0a0e15; }
 
   .filter-group { margin-bottom: 16px; }
@@ -320,6 +332,7 @@
   <div id="map"></div>
 
   <aside class="right">
+    <button id="detail-close" class="detail-close" type="button" aria-label="Свернуть панель" title="Свернуть">✕</button>
     <div id="detail" class="detail-empty">
       Клик по маркеру сельсовета — детали и список участков
     </div>
@@ -510,8 +523,8 @@ style.textContent = '.map-tiles-dark { filter: invert(0.92) hue-rotate(180deg) b
 document.head.appendChild(style);
 
 L.control.layers({
-  'OSM тёмная': baseDark,
-  'OSM светлая': baseLight,
+  'Схема тёмная': baseDark,
+  'Схема светлая': baseLight,
   'Спутник': baseSat,
 }, null, { collapsed: false, position: 'topright' }).addTo(map);
 
@@ -657,6 +670,7 @@ async function showDetail(code) {
   activeCode = code;
   const c = COUNCILS.find(x => x.code === code);
   if (!c) return;
+  document.querySelector('aside.right').classList.add('open');  // выдвинуть панель
   const det = document.getElementById('detail');
   det.classList.remove('detail-empty');
   // Show loading state immediately
@@ -1286,6 +1300,9 @@ document.addEventListener('click', e => {
 
 renderSidebar();
 document.getElementById('renters-search').addEventListener('input', e => renderRentersList(e.target.value));
+document.getElementById('detail-close').addEventListener('click', () => {
+  document.querySelector('aside.right').classList.remove('open');  // свернуть панель
+});
 buildMarkers();
 
 // Fit bounds to all councils
