@@ -15,13 +15,14 @@
 4. `preview_click` ненадёжен для Leaflet-контролов (шестерёнка) — поведение проверять через эмуляцию событий (`dispatchEvent`/`map.fire`), это эквивалент реального клика.
 
 ## Структура
-- **`index.html`** (~788 КБ) — весь сайт в одном файле:
+- **`index.html`** (~499 КБ после оптимизации) — весь сайт в одном файле:
   - `<style>` в `<head>` (включая `@media (max-width: 768px)` — мобильная версия);
-  - `<script id="data">` — встроенный JSON: сводки 337 советов (code, name, lat, lon, region, total, area, by_ownership, top_renters/owners/categories, stats, filters);
+  - `<script id="data">` — встроенный JSON: сводки **только 337 херсонских советов** (code, name, lat, lon, region, total, area, by_ownership, top_renters/owners/categories) + `stats`, `filters`, `renter_councils`. `STATS = DATA.stats` (используется поиском по арендатору). Рантайм-фильтр `COUNCILS = DATA.councils.filter(region==='Херсон')` — теперь по сути no-op.
   - основной JS в конце `<body>`.
-- **`parcels/*.geojson`** (675 файлов, ~282 МБ) — геометрия участков (в properties только `cadnum`), ленивая подгрузка по коду совета.
-- **`councils/*.json`** (675 файлов, ~220 МБ) — атрибуты участков совета (`c`,`a`,`o`,`r`,`ot`,`ct`,`mz`…), ленивая подгрузка.
-- **`gerb.svg`** — герб Херсонской области (РФ, проект 2022).
+- **`parcels/*.geojson`** (337 файлов) — геометрия участков (в properties только `cadnum`), ленивая подгрузка по коду совета. Не-херсонские удалены.
+- **`councils/*.json`** (337 файлов) — атрибуты участков совета (`c`,`a`,`o`,`r`,`ot`,`ct`,`mz`…), ленивая подгрузка. Не-херсонские удалены.
+- **Внешние ресурсы:** Leaflet+markercluster (unpkg, в `<body>`), шрифты IBM Plex (Google Fonts, async-`<link>` без render-blocking), **SheetJS — ленивая загрузка** `loadXlsx()` только при первом экспорте в Excel (не на старте). В `<head>` — preconnect/dns-prefetch к этим доменам и тайлам.
+- **`gerb.svg`** — герб Херсонской области (РФ, проект 2022); минифицирован SVGO (~225 КБ), показывается `<img>` высотой 50/62px.
 - **`robots.txt`** — `Disallow: /` (+ `noindex` мета в `index.html`).
 - **`CHANGELOG.md`**, **`README.md`**.
 
