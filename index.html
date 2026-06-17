@@ -354,7 +354,7 @@ const ownColor = s => OWN_COLOR[s] || '#e05252';
 })();
 
 // Init map
-const map = L.map('map', { zoomControl: true, attributionControl: true, maxZoom: 19, preferCanvas: true }).setView([46.88, 34.40], 10);
+const map = L.map('map', { zoomControl: true, attributionControl: true, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
@@ -1303,6 +1303,8 @@ buildMarkers();
 // Fit bounds to all councils
 const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
 map.fitBounds(bounds, { padding: [40, 40] });
+// старт на ~10% ближе: целочисленный фит + log2(1.1)
+map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
 </script>
 </body>
 </html>
