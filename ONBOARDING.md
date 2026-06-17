@@ -22,7 +22,6 @@
 - **`parcels/*.geojson`** (675 файлов, ~282 МБ) — геометрия участков (в properties только `cadnum`), ленивая подгрузка по коду совета.
 - **`councils/*.json`** (675 файлов, ~220 МБ) — атрибуты участков совета (`c`,`a`,`o`,`r`,`ot`,`ct`,`mz`…), ленивая подгрузка.
 - **`gerb.svg`** — герб Херсонской области (РФ, проект 2022).
-- **`vendor/`** — автономные зависимости (не CDN): `leaflet/` (Leaflet 1.9.4 + markercluster + images), `xlsx.full.min.js` (SheetJS), `fonts/` (IBM Plex woff2 + `fonts.css`). Подключены относительными путями; от unpkg/sheetjs/Google Fonts проект не зависит. **Внешними остаются только тайлы карты** (OSM/Esri) — см. открытые вопросы.
 - **`robots.txt`** — `Disallow: /` (+ `noindex` мета в `index.html`).
 - **`CHANGELOG.md`**, **`README.md`**.
 
