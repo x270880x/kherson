@@ -754,6 +754,7 @@ function buildMarkers() {
   COUNCILS.forEach(c => {
     if (!c.lat) return;
     const fs = getFilteredStats(c);
+    if (hasFilter && !(fs.count > 0)) return;   // при фильтре прячем советы без совпадений (0 / NaN)
     totalCount += fs.count;
     totalArea += fs.area;
     const sz = markerSize(c.total);
