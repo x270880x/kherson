@@ -710,11 +710,8 @@ async function showDetail(code) {
     </div>
 
     <div class="detail-stats">
-      <div class="row"><span class="k">Всего участков</span><span class="v big">${fmt(c.total)}</span></div>
-      <div class="row"><span class="k">Площадь</span><span class="v big">${fmt(c.area)} га</span></div>
-      <div class="row"><span class="k">Средний участок</span><span class="v">${(c.area/Math.max(1,c.total)).toFixed(2)} га</span></div>
       ${hasFilter ? `
-      <div class="row" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)"><span class="k">По фильтру: участков</span><span class="v big" style="color:var(--blue)">${fmt(parcels.length)}</span></div>
+      <div class="row"><span class="k">По фильтру: участков</span><span class="v big" style="color:var(--blue)">${fmt(parcels.length)}</span></div>
       <div class="row"><span class="k">По фильтру: площадь</span><span class="v big" style="color:var(--blue)">${fmt(filteredArea)} га</span></div>
       <div class="row"><span class="k">Доля от сельсовета</span><span class="v">${c.area>0 ? ((filteredArea/c.area)*100).toFixed(1) : 0}%</span></div>
       ` : ''}
