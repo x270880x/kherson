@@ -592,22 +592,42 @@ function restyleFilteredPolygons() {
   }
 }
 
+// Копирование кадастрового номера из попапа
+function fallbackCopy(text, ok) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); ok(); } catch (e) {}
+  document.body.removeChild(ta);
+}
+function copyCad(btn, text) {
+  const restore = btn.innerHTML;
+  const ok = () => {
+    btn.innerHTML = '✓'; btn.style.color = '#4caf7d'; btn.style.borderColor = '#4caf7d';
+    setTimeout(() => { btn.innerHTML = restore; btn.style.color = '#bbb'; btn.style.borderColor = 'rgba(255,255,255,0.25)'; }, 1100);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(ok).catch(() => fallbackCopy(text, ok));
+  } else fallbackCopy(text, ok);
+}
+const copyBtn = (text, title) => `<button onclick="copyCad(this,'${text}')" title="${title}" aria-label="${title}" style="display:inline-flex;align-items:center;background:none;border:1px solid rgba(255,255,255,0.25);border-radius:3px;color:#bbb;cursor:pointer;padding:2px 5px;line-height:1;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>`;
+
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
   const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e05252':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
   if (!data) {
-    return `<div style="font-size:12px;color:#e8c547"><div style="font-family:'IBM Plex Mono',monospace;font-weight:600">${cad}</div><div style="color:#aaa;font-size:11px">нет данных в базе</div>${basketBtn}</div>`;
+    return `<div style="font-size:12px;color:#e8c547"><div style="display:flex;align-items:center;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">${cad}</span>${copyBtn(cad, 'Скопировать кадастр (УКР)')}</div><div style="color:#aaa;font-size:11px">нет данных в базе</div>${basketBtn}</div>`;
   }
   const expColor = data.ey && data.ey < 2026 ? '#ff7575' : data.ey && data.ey <= 2027 ? '#ffc66e' : '#e8e8e8';
   return `
     <div style="font-size:12px;color:#e8e8e8;max-width:320px;line-height:1.45">
-      <div style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:#e8c547;font-size:13px;margin-bottom:2px">${cad}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:#e8c547;font-size:13px">${cad}</span>${copyBtn(cad, 'Скопировать кадастр (УКР)')}</div>
       <div style="font-size:11px;color:#aaa;margin-bottom:6px">${data.a} га · ${council ? escapeHtml(ruName(council.name)) : ''}</div>
       ${data.r ? `<div><b style="color:#aaa">аренд.:</b> ${data.r}</div>` : ''}
       ${data.o ? `<div><b style="color:#aaa">собств.:</b> ${data.o}</div>` : ''}
       ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
       ${data.ot ? `<div style="color:${ownColor(data.ot)};font-size:10px;margin-top:4px">${escapeHtml(ruOwn(data.ot))}</div>` : ''}
-      ${data.mz ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(192,80,255,0.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff;margin-top:2px">${data.mz}</div><div style="color:#aaa;font-size:10px;margin-top:2px">${data.mzmo}${data.mzp?` · передача: ${data.mzp}`:''}</div></div>` : ''}
+      ${data.mz ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(192,80,255,0.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff">${data.mz}</span>${copyBtn(data.mz, 'Скопировать кадастр РФ')}</div><div style="color:#aaa;font-size:10px;margin-top:2px">${data.mzmo}${data.mzp?` · передача: ${data.mzp}`:''}</div></div>` : ''}
       ${basketBtn}
     </div>`;
 }
