@@ -376,6 +376,7 @@ const RAION_BY_PREFIX = {
   "254":"Каховский район"
 };
 const raionOf = code => RAION_BY_PREFIX[(code || '').slice(2, 5)] || '';
+const ruName = name => nameParts(name).ru;   // только русское название (без украинского)
 
 // Заголовок детали: русское название крупно + «район (укр. название)» мелким снизу
 function detailTitle(c) {
@@ -539,7 +540,7 @@ function buildParcelPopup(cad, data, council) {
       ${data.r ? `<div><b style="color:#aaa">аренд.:</b> ${data.r}</div>` : ''}
       ${data.o ? `<div><b style="color:#aaa">собств.:</b> ${data.o}</div>` : ''}
       ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
-      ${data.ot ? `<div style="color:${ownColor(data.ot)};font-size:10px;margin-top:4px">${data.ot}</div>` : ''}
+      ${data.ot ? `<div style="color:${ownColor(data.ot)};font-size:10px;margin-top:4px">${escapeHtml(ruOwn(data.ot))}</div>` : ''}
       ${data.mz ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(192,80,255,0.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff;margin-top:2px">${data.mz}</div><div style="color:#aaa;font-size:10px;margin-top:2px">${data.mzmo}${data.mzp?` · передача: ${data.mzp}`:''}</div></div>` : ''}
       ${basketBtn}
     </div>`;
@@ -698,7 +699,7 @@ function buildMarkers() {
     const ttArea = hasFilter
       ? `${fmt(fs.area)} / ${fmt(c.area)} га`
       : `${fmt(c.area)} га`;
-    m.bindTooltip(`<div class="pname">${c.name}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
+    m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       direction: 'top', offset: [0, -sz/2], opacity: 0.95
     });
     m.on('click', () => {
@@ -1280,7 +1281,7 @@ search.addEventListener('input', e => {
     sr.innerHTML = matches.slice(0,20).map((c,i)=>`
       <div class="item" data-i="${i}">
         <div class="cad">${c.code}</div>
-        <div class="who">${escapeHtml(c.name)} · ${c.total} участков</div>
+        <div class="who">${escapeHtml(ruName(c.name))} · ${c.total} участков</div>
       </div>
     `).join('') || '<div class="item" style="color:var(--muted)">Сельсовет не найден</div>';
     sr.style.display = 'block';
@@ -1324,13 +1325,13 @@ search.addEventListener('input', e => {
   sr.innerHTML = results.map((r,i)=>{
     if (r.type === 'council') return `
       <div class="item" data-i="${i}">
-        <div class="cad">${escapeHtml(r.council.name)}</div>
+        <div class="cad">${escapeHtml(ruName(r.council.name))}</div>
         <div class="who">${r.council.code} · ${r.council.total} участков</div>
       </div>`;
     return `
       <div class="item" data-i="${i}">
         <div class="cad">${escapeHtml(r.p.c)}</div>
-        <div class="who">${escapeHtml(r.council.name)}${r.p.r? ' · аренд.: '+escapeHtml(r.p.r.slice(0,40)):''}${r.p.o? ' · '+escapeHtml(r.p.o.slice(0,40)):''}</div>
+        <div class="who">${escapeHtml(ruName(r.council.name))}${r.p.r? ' · аренд.: '+escapeHtml(r.p.r.slice(0,40)):''}${r.p.o? ' · '+escapeHtml(r.p.o.slice(0,40)):''}</div>
       </div>`;
   }).join('');
   sr.style.display = 'block';
