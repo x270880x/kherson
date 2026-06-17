@@ -6,6 +6,9 @@
 <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
 <meta name="referrer" content="no-referrer">
 <title>Кадастровая карта — Херсонская область</title>
+<link rel="icon" href="favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -38,7 +41,7 @@
     background: linear-gradient(180deg, #0d1520 0%, var(--bg) 100%);
     display: flex; justify-content: flex-start; align-items: center; gap: 28px; flex-shrink: 0;
   }
-  header .gerb { align-self: stretch; aspect-ratio: 10850 / 13540; background: url(gerb.svg) center / contain no-repeat; flex-shrink: 0; margin-right: -14px; }
+  header .gerb { height: 50px; width: auto; flex-shrink: 0; margin-right: -14px; }
   header .left .label {
     font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
@@ -249,7 +252,7 @@
   @media (max-width: 768px) {
     /* Компактная шапка */
     header { flex-wrap: nowrap; align-items: flex-start; gap: 10px; padding: 8px 12px; }
-    header .gerb { margin-right: 0; }
+    header .gerb { height: 62px; margin-right: 0; }
     header .left { flex: 1; min-width: 0; }
     header h1 { font-size: 15px; white-space: normal; line-height: 1.15; }
     header .left .label { font-size: 8px; letter-spacing: 1px; }
@@ -276,7 +279,7 @@
 </head>
 <body>
 <header>
-  <div class="gerb" role="img" aria-label="Герб Херсонской области" title="Херсонская область"></div>
+  <img class="gerb" src="gerb.svg" alt="Герб Херсонской области" title="Херсонская область"/>
   <div class="left">
     <div class="label">КАДАСТРОВАЯ КАРТА</div>
     <h1>Херсонская область</h1>
