@@ -503,17 +503,21 @@ let activePolyCode = null;
 // Показывать полигоны только текущего села; полигоны прошлого убираем с карты (но держим в кэше)
 function showOnlyPolygons(code) {
   if (!polygonsVisible) return;
-  if (activePolyCode && activePolyCode !== code) {
-    const prev = polygonLayers[activePolyCode];
-    if (prev && map.hasLayer(prev)) map.removeLayer(prev);
+  for (const c in polygonLayers) {           // убрать ВСЕ прочие показанные слои (в т.ч. добавленные Shift+кликом)
+    if (c !== code && map.hasLayer(polygonLayers[c])) map.removeLayer(polygonLayers[c]);
   }
   const cur = polygonLayers[code];
   if (cur && !map.hasLayer(cur)) cur.addTo(map);
   activePolyCode = code;
 }
+function addPolygonsAdditive(code) {          // ПК Shift+клик: добавить слой, НЕ убирая ранее открытые
+  if (!polygonsVisible) return;
+  const cur = polygonLayers[code];
+  if (cur && !map.hasLayer(cur)) cur.addTo(map);
+}
 
-async function loadCouncilPolygons(code) {
-  if (polygonLayers[code]) { showOnlyPolygons(code); return polygonLayers[code]; }
+async function loadCouncilPolygons(code, additive = false) {
+  if (polygonLayers[code]) { additive ? addPolygonsAdditive(code) : showOnlyPolygons(code); return polygonLayers[code]; }
   const council = COUNCILS.find(c => c.code === code);
   if (!council) return null;
   // Ensure council data is loaded for popup info
@@ -552,11 +556,29 @@ async function loadCouncilPolygons(code) {
       l.bindPopup(buildParcelPopup(cad, data, council)).openPopup();
     });
     polygonLayers[code] = layer;
-    showOnlyPolygons(code);
+    additive ? addPolygonsAdditive(code) : showOnlyPolygons(code);
     return layer;
   } catch (e) {
     console.warn(`No polygons for ${code}:`, e);
     return null;
+  }
+}
+
+// ПК: Shift+клик по селу — открыть его участки, НЕ закрывая ранее открытые; вписать в окно все показанные массивы
+async function addCouncilView(code) {
+  const layer = await loadCouncilPolygons(code, true);
+  if (!layer || !layer.getLayers().length) return;
+  let b = null;
+  for (const cc in polygonLayers) {
+    const l = polygonLayers[cc];
+    if (map.hasLayer(l) && l.getLayers().length) {
+      const lb = l.getBounds();
+      b = b ? b.extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
+    }
+  }
+  if (b && b.isValid()) {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    map.flyToBounds(b, { paddingTopLeft: [40, 40], paddingBottomRight: isMobile ? [40, 40] : [300, 40], duration: 0.6 });
   }
 }
 
@@ -816,7 +838,11 @@ function buildMarkers() {
       // на мобиле — снизу (название не срезается верхним краем при тапе/зуме), на десктопе — сверху
       direction: ttMobile ? 'bottom' : 'top', offset: [0, ttMobile ? sz/2 : -sz/2], opacity: 0.95
     });
-    m.on('click', () => focusCouncil(c.code));  // клик по селу → плавно вписать все участки кластера в окно
+    m.on('click', (e) => {
+      // ПК: Shift+клик — добавить участки села, не закрывая ранее открытые; обычный клик — показать только это село
+      if (e.originalEvent && e.originalEvent.shiftKey) addCouncilView(c.code);
+      else focusCouncil(c.code);
+    });
     markers[c.code] = m;
   });
   restyleFilteredPolygons();
