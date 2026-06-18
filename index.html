@@ -241,6 +241,10 @@
   /* Подсказка режима «Полная карта» */
   .fullmap-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15,17,23,0.92); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 12px; border-radius: 6px; pointer-events: none; display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
   .fullmap-hint.show { display: block; }
+  /* Подписи городов/сёл в режиме «Полная карта» */
+  .leaflet-tooltip.council-label { background: rgba(15,17,23,0.74); color: #fff; border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.55); font: 600 11px 'IBM Plex Sans', sans-serif; padding: 1px 6px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.85); }
+  .leaflet-tooltip.council-label.town { color: var(--accent); font-size: 12.5px; font-weight: 700; padding: 2px 8px; }
+  .leaflet-tooltip.council-label::before { display: none !important; }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -719,8 +723,23 @@ let fullMapMode = false;
 const FULL_MIN_ZOOM = 12.5;     // ниже — не грузим (слишком крупная область)
 const FULL_MAX_COUNCILS = 8;    // если в кадр попадает больше — просим приблизить ещё
 const fullMapShown = new Set(); // коды советов, показанных авто-режимом
+const fullMapLabelByCode = {};          // код → подпись города/села (tooltip на карте)
 let fullMapHintEl = null;
 let fmRunning = false, fmPending = false;
+
+function fmAddLabel(c) {
+  if (fullMapLabelByCode[c.code] || !c.lat) return;
+  const rn = ruName(c.name);
+  const town = /^(пгт|г\.|м\.|город)/i.test(rn);
+  const tip = L.tooltip({ permanent: true, direction: 'center', className: 'council-label' + (town ? ' town' : ''), interactive: false })
+    .setLatLng([c.lat, c.lon]).setContent(escapeHtml(rn));
+  tip.addTo(map);
+  fullMapLabelByCode[c.code] = tip;
+}
+function fmRemoveLabel(code) {
+  const tip = fullMapLabelByCode[code];
+  if (tip) { if (map.hasLayer(tip)) map.removeLayer(tip); delete fullMapLabelByCode[code]; }
+}
 
 function fmHint(text) {
   if (!fullMapHintEl) fullMapHintEl = L.DomUtil.create('div', 'fullmap-hint', map.getContainer());
@@ -732,6 +751,7 @@ function fmClear() {
     if (polygonLayers[code] && map.hasLayer(polygonLayers[code])) map.removeLayer(polygonLayers[code]);
   }
   fullMapShown.clear();
+  for (const k in fullMapLabelByCode) fmRemoveLabel(k);
 }
 async function fmUpdate() {
   if (!fullMapMode) return;
@@ -755,6 +775,7 @@ async function fmUpdate() {
           for (const code of [...fullMapShown]) {        // убрать вышедшие из кадра
             if (!wanted.has(code)) {
               if (polygonLayers[code] && map.hasLayer(polygonLayers[code])) map.removeLayer(polygonLayers[code]);
+              fmRemoveLabel(code);
               fullMapShown.delete(code);
             }
           }
@@ -762,6 +783,7 @@ async function fmUpdate() {
             if (fullMapShown.has(c.code) || !fullMapMode) continue;
             fullMapShown.add(c.code);
             await loadCouncilPolygons(c.code, true);      // additive: добавить, не убирая прочие
+            if (fullMapMode) fmAddLabel(c);               // подпись города/села над блоком
           }
         }
       }
