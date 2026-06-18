@@ -238,6 +238,9 @@
   /* Переключатель слоёв — иконка-шестерёнка */
   .leaflet-control-layers-toggle { background-image: none !important; width: 26px !important; height: 26px !important; display: flex; align-items: center; justify-content: center; }
   .leaflet-control-layers-toggle svg { width: 15px; height: 15px; fill: #333; }
+  /* Подсказка режима «Полная карта» */
+  .fullmap-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15,17,23,0.92); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 12px; border-radius: 6px; pointer-events: none; display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  .fullmap-hint.show { display: block; }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -686,11 +689,12 @@ const style = document.createElement('style');
 style.textContent = '.map-tiles-dark { filter: invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.7); }';
 document.head.appendChild(style);
 
+const fullMapLayer = L.layerGroup();   // фиктивный слой-тумблер режима «Полная карта»
 const layersCtrl = L.control.layers({
   'Схема тёмная': baseDark,
   'Схема светлая': baseLight,
   'Спутник': baseSat,
-}, null, { collapsed: true, position: 'topright' }).addTo(map);
+}, { 'Полная карта (участки по зуму)': fullMapLayer }, { collapsed: true, position: 'topright' }).addTo(map);
 // Шестерёнка слоёв: открывать по КЛИКУ (не по наведению), закрывать по клику в любое другое место
 (() => {
   const box = layersCtrl.getContainer();
@@ -709,6 +713,81 @@ const layersCtrl = L.control.layers({
     if (box.classList.contains('leaflet-control-layers-expanded') && !box.contains(e.target)) box.classList.remove('leaflet-control-layers-expanded');
   });
 })();
+
+// ===== Режим «Полная карта»: авто-подгрузка участков советов, попавших в кадр =====
+let fullMapMode = false;
+const FULL_MIN_ZOOM = 12.5;     // ниже — не грузим (слишком крупная область)
+const FULL_MAX_COUNCILS = 8;    // если в кадр попадает больше — просим приблизить ещё
+const fullMapShown = new Set(); // коды советов, показанных авто-режимом
+let fullMapHintEl = null;
+let fmRunning = false, fmPending = false;
+
+function fmHint(text) {
+  if (!fullMapHintEl) fullMapHintEl = L.DomUtil.create('div', 'fullmap-hint', map.getContainer());
+  if (text) { fullMapHintEl.textContent = text; fullMapHintEl.classList.add('show'); }
+  else fullMapHintEl.classList.remove('show');
+}
+function fmClear() {
+  for (const code of fullMapShown) {
+    if (polygonLayers[code] && map.hasLayer(polygonLayers[code])) map.removeLayer(polygonLayers[code]);
+  }
+  fullMapShown.clear();
+}
+async function fmUpdate() {
+  if (!fullMapMode) return;
+  if (fmRunning) { fmPending = true; return; }   // идёт загрузка — поставим в очередь один прогон
+  fmRunning = true;
+  try {
+    let go = true;
+    while (go && fullMapMode) {
+      go = false;
+      const z = map.getZoom();
+      if (z < FULL_MIN_ZOOM) {
+        fmClear(); fmHint('Приблизьте, чтобы увидеть участки');
+      } else {
+        const b = map.getBounds();
+        const inView = COUNCILS.filter(c => c.lat && b.contains([c.lat, c.lon]));
+        if (inView.length > FULL_MAX_COUNCILS) {
+          fmClear(); fmHint('Приблизьте ещё — область слишком большая');
+        } else {
+          fmHint('');
+          const wanted = new Set(inView.map(c => c.code));
+          for (const code of [...fullMapShown]) {        // убрать вышедшие из кадра
+            if (!wanted.has(code)) {
+              if (polygonLayers[code] && map.hasLayer(polygonLayers[code])) map.removeLayer(polygonLayers[code]);
+              fullMapShown.delete(code);
+            }
+          }
+          for (const c of inView) {                       // догрузить новые
+            if (fullMapShown.has(c.code) || !fullMapMode) continue;
+            fullMapShown.add(c.code);
+            await loadCouncilPolygons(c.code, true);      // additive: добавить, не убирая прочие
+          }
+        }
+      }
+      if (fmPending) { fmPending = false; go = true; }    // за время загрузки сдвинули карту — ещё прогон
+    }
+  } finally {
+    fmRunning = false;
+    if (!fullMapMode) fmClear();                          // режим выключили во время загрузки
+  }
+}
+function enableFullMap() {
+  fullMapMode = true;
+  if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);          // убрать кружки-маркеры
+  for (const c in polygonLayers) if (map.hasLayer(polygonLayers[c])) map.removeLayer(polygonLayers[c]);
+  activePolyCode = null;
+  fmUpdate();
+}
+function disableFullMap() {
+  fullMapMode = false;
+  fmClear();
+  fmHint('');
+  if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);               // вернуть маркеры
+}
+map.on('overlayadd', e => { if (e.layer === fullMapLayer) enableFullMap(); });
+map.on('overlayremove', e => { if (e.layer === fullMapLayer) disableFullMap(); });
+map.on('moveend zoomend', () => { if (fullMapMode) fmUpdate(); });
 
 let markers = {};
 let activeCode = null;
