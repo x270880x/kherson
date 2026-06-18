@@ -110,6 +110,10 @@
   }
   .filter-group select { height: 27px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; font-size: 13px; }
   .filter-group input:focus, .filter-group select:focus { outline: none; border-color: var(--accent); }
+  #own-mode { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+  #own-mode button { flex: 1; padding: 5px 4px; background: var(--surface2); color: var(--muted); border: none; cursor: pointer; font-family: inherit; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; line-height: 1; }
+  #own-mode button + button { border-left: 1px solid var(--border); }
+  #own-mode button.on { background: var(--accent); color: #1a1a1a; font-weight: 600; }
 
   .btn-reset, .btn-export {
     width: 100%; padding: 5px 8px; background: transparent; color: var(--muted);
@@ -308,6 +312,10 @@
 
     <div class="filter-group">
       <label>Форма собственности</label>
+      <div id="own-mode">
+        <button type="button" data-mode="council" class="on">По сёлам</button>
+        <button type="button" data-mode="all">Вся карта</button>
+      </div>
       <div id="filter-ownership" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px;font-size:11px"></div>
     </div>
 
@@ -706,6 +714,11 @@ let markers = {};
 let activeCode = null;
 let filterRenter = '';
 let filterOwnership = new Set();
+// Режим блока собственности: 'council' (фильтр по открытым сёлам) | 'all' (показ типа по всей области)
+let ownMode = 'council';
+const ownRegionLayers = {};   // ot → L.geoJSON (региональный слой, lazy)
+const OWN_FILE = { 'Державна власність': 'own_gos', 'Комунальна власність': 'own_kom', 'Не визначено': 'own_nedef' };
+const OWN_PRIVATE = 'Приватна власність';   // частную по всей области не показываем (≈440к участков)
 let filterCategory = '';
 let filterRegion = '';
 let filterLeaseYear = '';
@@ -807,6 +820,61 @@ function getFilteredStats(council) {
 }
 
 function fmt(n) { return Number(n).toLocaleString('ru'); }
+
+// ── Режим «вся карта»: показ участков выбранной формы собственности по всей области ──
+async function showOwnRegion(ot) {
+  const key = OWN_FILE[ot];
+  if (!key) return;
+  if (!ownRegionLayers[ot]) {
+    try {
+      const resp = await fetch(`${key}.geojson`);
+      if (!resp.ok) return;
+      const fcoll = await resp.json();
+      const lyr = L.geoJSON(fcoll, {
+        smoothFactor: 2,
+        style: { color: ownColor(ot), weight: 0.6, fillColor: ownColor(ot), fillOpacity: 0.5 }
+      });
+      lyr.on('click', e => {        // делегирование на весь слой (без обработчиков на каждом из десятков тысяч участков)
+        const l = e.layer, f = l.feature, cad = f.properties.cadnum;
+        if (e.originalEvent && e.originalEvent.shiftKey) { basketToggle(cad); L.DomEvent.stopPropagation(e); return; }
+        const council = COUNCILS.find(c => c.code === cad.slice(0, 10));
+        l.bindPopup(buildParcelPopup(cad, { c: cad, a: f.properties.a, ot: f.properties.ot }, council)).openPopup();
+      });
+      ownRegionLayers[ot] = lyr;
+    } catch (e) { return; }
+  }
+  if (ownMode !== 'all') return;   // режим мог смениться, пока грузилось
+  if (!map.hasLayer(ownRegionLayers[ot])) ownRegionLayers[ot].addTo(map);
+}
+function hideOwnRegion(ot) {
+  if (ownRegionLayers[ot] && map.hasLayer(ownRegionLayers[ot])) map.removeLayer(ownRegionLayers[ot]);
+}
+function applyOwnModeUI() {
+  document.querySelectorAll('#own-mode button').forEach(b => b.classList.toggle('on', b.dataset.mode === ownMode));
+  document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => {
+    const dim = (ownMode === 'all' && cb.value === OWN_PRIVATE);   // в режиме «вся карта» частная замучена и некликабельна
+    cb.disabled = dim;
+    const lbl = cb.closest('label');
+    if (lbl) { lbl.style.opacity = dim ? '0.35' : ''; lbl.style.pointerEvents = dim ? 'none' : ''; }
+  });
+}
+function setOwnMode(mode) {
+  if (mode === ownMode) return;
+  ownMode = mode;
+  document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
+  filterOwnership = new Set();
+  if (mode === 'all') {
+    for (const c in polygonLayers) if (map.hasLayer(polygonLayers[c])) map.removeLayer(polygonLayers[c]);  // убрать полигоны открытых сёл
+    activePolyCode = null;
+    buildMarkers();
+    const pts = COUNCILS.filter(c => c.lat).map(c => [c.lat, c.lon]);
+    if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [40, 40], duration: 0.6 });  // показать всю область
+  } else {
+    for (const ot in ownRegionLayers) hideOwnRegion(ot);   // убрать региональные слои
+    buildMarkers();
+  }
+  applyOwnModeUI();
+}
 
 function buildMarkers() {
   // Clear existing
@@ -1233,6 +1301,10 @@ function renderSidebar() {
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
     cb.addEventListener('change', () => {
+      if (ownMode === 'all') {        // режим «вся карта»: галка = показать/скрыть участки этой формы по всей области
+        if (cb.checked) showOwnRegion(cb.value); else hideOwnRegion(cb.value);
+        return;
+      }
       filterOwnership = new Set(
         Array.from(fo.querySelectorAll('input[data-ownership]:checked')).map(x => x.value)
       );
@@ -1240,6 +1312,8 @@ function renderSidebar() {
       if (activeCode) showDetail(activeCode);
     });
   });
+  document.querySelectorAll('#own-mode button').forEach(b => b.addEventListener('click', () => setOwnMode(b.dataset.mode)));
+  applyOwnModeUI();
   const fc = document.getElementById('filter-category');
   FILTERS.categories.forEach(r => {
     const short = r.length > 60 ? r.slice(0,57)+'…' : r;
