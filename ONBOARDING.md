@@ -23,6 +23,7 @@
 - **`councils/*.json`** (337 файлов) — атрибуты участков совета (`c`,`a`,`o`,`r`,`ot`,`ct`,`mz`…), ленивая подгрузка. Не-херсонские удалены.
 - **Внешние ресурсы:** Leaflet+markercluster (unpkg, в `<body>`), шрифты IBM Plex (Google Fonts, async-`<link>` без render-blocking), **SheetJS — ленивая загрузка** `loadXlsx()` только при первом экспорте в Excel (не на старте). В `<head>` — preconnect/dns-prefetch к этим доменам и тайлам.
 - **`gerb.svg`** — герб Херсонской области (РФ, проект 2022); минифицирован SVGO (~225 КБ), показывается `<img>` высотой 50/62px.
+- **`own_gos.geojson` / `own_kom.geojson` / `own_nedef.geojson`** — региональные слои геометрии по форме собственности (гос 16.5к / комм 39к / не опр. 35к участков; props: cadnum, ot, a). Собраны из `parcels/`+`councils/` скриптом-мерджем. Грузятся лениво в режиме шапки собственности **«Вся карта»** (`ownMode='all'`, `showOwnRegion`/`hideOwnRegion`, `OWN_FILE`). Частная не делается (≈440к). Переключатель `#own-mode` («По сёлам»/«Вся карта»), `setOwnMode`, частная замучена/заблокирована в режиме «Вся карта».
 - **`robots.txt`** — `Disallow: /` (+ `noindex` мета в `index.html`).
 - **`CHANGELOG.md`**, **`README.md`**.
 
