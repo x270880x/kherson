@@ -5,12 +5,12 @@
 "minzoom": "8",
 "maxzoom": "14",
 "center": "32.904053,46.111325,14",
-"bounds": "31.799841,45.947271,35.103184,47.420712",
-"antimeridian_adjusted_bounds": "31.799841,45.947271,35.103184,47.420712",
+"bounds": "31.799841,45.947316,35.103184,47.420757",
+"antimeridian_adjusted_bounds": "31.799841,45.947316,35.103184,47.420757",
 "type": "overlay",
-"strategies": "[{},{},{},{},{},{},{},{},{\"dropped_as_needed\":421110,\"tiny_polygons\":88014,\"tile_size_desired\":4236565,\"feature_count_desired\":211152},{\"tiny_polygons\":80191},{\"tiny_polygons\":24904},{\"tiny_polygons\":12389},{\"tiny_polygons\":6896},{\"tiny_polygons\":1457},{\"tiny_polygons\":596}]",
+"strategies": "[{},{},{},{},{},{},{},{},{\"dropped_as_needed\":421915,\"tiny_polygons\":87620,\"tile_size_desired\":4234625,\"feature_count_desired\":211133},{\"tiny_polygons\":80186},{\"tiny_polygons\":24963},{\"tiny_polygons\":12341},{\"tiny_polygons\":6899},{\"tiny_polygons\":1461},{\"tiny_polygons\":630}]",
 "format": "pbf",
 "generator": "tippecanoe v2.79.0",
-"generator_options": "tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o --drop-densest-as-needed --maximum-tile-bytes 2000000 --no-tile-compression --force '--name=Kherson parcels' /tmp/all_parcels.geojsonl",
+"generator_options": "tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o --drop-densest-as-needed --maximum-tile-bytes 2000000 --no-tile-compression --force '--name=Kherson parcels' /var/folders/4w/fdk7mj7x1d79ncrcv70w98sh0000gn/T/tmp.29O42jH33i/all_parcels.geojsonl",
 "json": "{\"vector_layers\":[{\"id\":\"parcels\",\"description\":\"\",\"minzoom\":8,\"maxzoom\":14,\"fields\":{\"o\":\"String\"}}],\"tilestats\":{\"layerCount\":1,\"layers\":[{\"layer\":\"parcels\",\"count\":530600,\"geometry\":\"Polygon\",\"attributeCount\":1,\"attributes\":[{\"attribute\":\"o\",\"count\":4,\"type\":\"string\",\"values\":[\"g\",\"k\",\"n\",\"p\"]}]}]}}"
 }
