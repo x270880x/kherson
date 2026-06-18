@@ -811,8 +811,10 @@ function buildMarkers() {
     const ttArea = hasFilter
       ? `${fmt(fs.area)} / ${fmt(c.area)} га`
       : `${fmt(c.area)} га`;
+    const ttMobile = window.matchMedia('(max-width: 768px)').matches;
     m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
-      direction: 'top', offset: [0, -sz/2], opacity: 0.95
+      // на мобиле — снизу (название не срезается верхним краем при тапе/зуме), на десктопе — сверху
+      direction: ttMobile ? 'bottom' : 'top', offset: [0, ttMobile ? sz/2 : -sz/2], opacity: 0.95
     });
     m.on('click', () => focusCouncil(c.code));  // клик по селу → плавно вписать все участки кластера в окно
     markers[c.code] = m;
