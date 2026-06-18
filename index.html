@@ -580,6 +580,7 @@ async function addCouncilView(code) {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
     map.flyToBounds(b, { paddingTopLeft: [40, 40], paddingBottomRight: isMobile ? [40, 40] : [300, 40], duration: 0.6 });
   }
+  if (hasAnyFilter()) showDetail(activeCode || code);  // обновить панель: суммарная строка по всем открытым сёлам
 }
 
 function parcelStyle(f, council) {
@@ -848,6 +849,19 @@ function buildMarkers() {
   restyleFilteredPolygons();
 }
 
+// Суммарно по фильтру для ВСЕХ открытых на карте сёл (для накопительного Shift-показа)
+function openFilteredTotal() {
+  let councils = 0, count = 0, area = 0;
+  for (const cc in polygonLayers) {
+    if (!map.hasLayer(polygonLayers[cc])) continue;
+    councils++;
+    const c = COUNCILS.find(x => x.code === cc);
+    if (!c || !c.parcels) continue;
+    for (const p of c.parcels) if (parcelMatchesFilters(p, c.region)) { count++; area += p.a || 0; }
+  }
+  return { councils, count, area: Math.round(area * 10) / 10 };
+}
+
 async function showDetail(code) {
   activeCode = code;
   const c = COUNCILS.find(x => x.code === code);
@@ -881,6 +895,7 @@ async function showDetail(code) {
   const parcels = (c.parcels || []).filter(p => parcelMatchesFilters(p, c.region));
   const filteredArea = Math.round(parcels.reduce((s,p)=>s+(p.a||0),0) * 10) / 10;
   const hasFilter = hasAnyFilter();
+  const openTot = hasFilter ? openFilteredTotal() : { councils: 0, count: 0, area: 0 };
   const shown = parcels;  // all
 
   det.innerHTML = `
@@ -915,6 +930,7 @@ async function showDetail(code) {
       <div class="row"><span class="k">По фильтру: участков</span><span class="v big" style="color:var(--blue)">${fmt(parcels.length)}</span></div>
       <div class="row"><span class="k">По фильтру: площадь</span><span class="v big" style="color:var(--blue)">${fmt(filteredArea)} га</span></div>
       <div class="row"><span class="k">Доля от сельсовета</span><span class="v">${c.area>0 ? ((filteredArea/c.area)*100).toFixed(1) : 0}%</span></div>
+      ${openTot.councils > 1 ? `<div class="row" style="border-top:1px solid var(--border);margin-top:5px;padding-top:6px"><span class="k">Открыто сёл: ${openTot.councils} · всего по фильтру</span><span class="v big" style="color:var(--accent)">${fmt(openTot.count)} уч · ${fmt(openTot.area)} га</span></div>` : ''}
       ` : ''}
     </div>
 
