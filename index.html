@@ -720,8 +720,8 @@ const layersCtrl = L.control.layers({
 
 // ===== Режим «Полная карта»: авто-подгрузка участков советов, попавших в кадр =====
 let fullMapMode = false;
-const FULL_MIN_ZOOM = 12.5;     // ниже — не грузим (слишком крупная область)
-const FULL_MAX_COUNCILS = 8;    // если в кадр попадает больше — просим приблизить ещё
+const FULL_MIN_ZOOM = 12;       // ниже — не грузим (слишком крупная область)
+const FULL_MAX_COUNCILS = 24;   // если в кадр попадает больше — просим приблизить ещё
 const fullMapShown = new Set(); // коды советов, показанных авто-режимом
 const fullMapLabelByCode = {};          // код → подпись города/села (tooltip на карте)
 let fullMapHintEl = null;
@@ -779,12 +779,12 @@ async function fmUpdate() {
               fullMapShown.delete(code);
             }
           }
-          for (const c of inView) {                       // догрузить новые
-            if (fullMapShown.has(c.code) || !fullMapMode) continue;
-            fullMapShown.add(c.code);
-            await loadCouncilPolygons(c.code, true);      // additive: добавить, не убирая прочие
-            if (fullMapMode) fmAddLabel(c);               // подпись города/села над блоком
-          }
+          const toLoad = inView.filter(c => !fullMapShown.has(c.code));   // догрузить новые
+          toLoad.forEach(c => fullMapShown.add(c.code));
+          await Promise.all(toLoad.map(async c => {        // параллельно (а не по очереди) — fetch'и перекрываются
+            await loadCouncilPolygons(c.code, true);       // additive: добавить, не убирая прочие
+            if (fullMapMode) fmAddLabel(c);                // подпись города/села над блоком
+          }));
         }
       }
       if (fmPending) { fmPending = false; go = true; }    // за время загрузки сдвинули карту — ещё прогон
