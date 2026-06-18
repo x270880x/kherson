@@ -1466,7 +1466,7 @@ function renderBasketPanel() {
   basketView = true;
   const det = document.getElementById('detail');
   det.classList.remove('detail-empty');
-  const items = [...basket];
+  const items = [...basket].reverse();   // последние добавленные — сверху списка
   const CAP = 300, shown = items.slice(0, CAP);
   // индекс площадей по советам (каждый совет индексируется один раз)
   const idxCache = {};
