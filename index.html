@@ -1482,11 +1482,17 @@ document.getElementById('filter-mz').addEventListener('change', e => {
 const basket = new Set();
 let basketView = false;
 // Список выбранных участков в правой панели
-function renderBasketPanel() {
+async function renderBasketPanel() {
   basketView = true;
   const det = document.getElementById('detail');
   det.classList.remove('detail-empty');
   const items = [...basket].reverse();   // последние добавленные — сверху списка
+  // Подгрузить данные советов из подборки — иначе у участков, добавленных из
+  // региональных слоёв «Вся карта», не будет площади и формы собственности.
+  await Promise.all([...new Set(items.map(c => c.slice(0, 10)))].map(code => {
+    const c = COUNCILS.find(x => x.code === code);
+    return (c && !c.parcels) ? ensureCouncilParcels(c) : null;
+  }));
   const CAP = 300, shown = items.slice(0, CAP);
   // индекс площадей по советам (каждый совет индексируется один раз)
   const idxCache = {};
