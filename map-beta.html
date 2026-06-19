@@ -340,7 +340,7 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
   map.fitBounds(KHERSON_BOUNDS, { padding: 12, duration: 0 });   // гарантируем кадр на всю область (после раскладки контейнера)
-  map.once('idle', ()=>{ map.setZoom(Math.floor(map.getZoom())+Math.log2(1.213),{animate:false}); map.setMinZoom(map.getZoom()); updateZoutBtn(); });
+  map.once('idle', ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); });
 });
 
 // Рамка-выделение: Shift+перетаскивание
