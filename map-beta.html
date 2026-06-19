@@ -196,7 +196,7 @@ function addCouncilLabels(){
     const best=pool.reduce((a,b)=>(+b.total||0)>(+a.total||0)?b:a); if(best) centers.add(best.c); }
   const feats=pts.map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n).replace(/^пгт\s+/i,''),total:c.total||0,ctr:centers.has(c.c),big:BIG_TOWNS.has(c.c),offLow:OFFLOW[c.c]}}));
   // Херсон (~280k) отсутствует в данных как единый НП — добавляем вручную как центр (на обзоре виден)
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★ Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0]}});   //   — волосяной пробел (звезда ближе к слову)
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0]}});   //   — волосяной пробел (звезда ближе к слову)
   // Верхній Рогачик (центр Верхнерогачикского р-на) отсутствует в данных — добавляем вручную как центр
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true}});
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
