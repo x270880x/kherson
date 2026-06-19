@@ -51,7 +51,7 @@
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
   <div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:2px 0 3px">529 725 уч · 1 912 549 га · 337 сёл · 20 р-нов · 2 412 разм.</div>
-  <div style="margin:4px 0"><button id="b-scheme" class="bt on">Схема</button><button id="b-sat" class="bt">Спутник</button></div>
+  <div style="margin:4px 0"><button class="bt on" data-b="light">Светлая</button><button class="bt" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
   <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
@@ -85,13 +85,15 @@ const map = new maplibregl.Map({
     version: 8,
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
+      light: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
       base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
       sat: { type:'raster', tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize:256, maxzoom:19 },
       omt: { type:'vector', url:'https://tiles.openfreemap.org/planet', attribution:'© OpenMapTiles' },
       parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:8, maxzoom:14 }
     },
     layers: [
-      { id:'base', type:'raster', source:'base' },
+      { id:'light', type:'raster', source:'light' },
+      { id:'base', type:'raster', source:'base', layout:{visibility:'none'} },
       { id:'sat', type:'raster', source:'sat', layout:{visibility:'none'} },
       { id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
         paint:{ 'fill-color':['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e05252','#888888'], 'fill-opacity':0.55, 'fill-antialias':false } },
@@ -113,16 +115,19 @@ const zoomStep = d => map.easeTo({ zoom: Math.round(map.getZoom()) + d, duration
 document.getElementById('zin').onclick  = () => zoomStep(+1);
 document.getElementById('zout').onclick = () => zoomStep(-1);
 
-// Переключатель подложки: схема (тёмная) / спутник (Esri)
-function setBase(sat){
-  if(!map.getLayer('sat')) return;
-  map.setLayoutProperty('base','visibility', sat?'none':'visible');
-  map.setLayoutProperty('sat','visibility', sat?'visible':'none');
-  document.getElementById('b-scheme').classList.toggle('on', !sat);
-  document.getElementById('b-sat').classList.toggle('on', sat);
+// Переключатель подложки: светлая (voyager) / тёмная (CARTO dark) / спутник (Esri)
+function setBaseLabels(isLight){
+  const halo=isLight?'#ffffff':'#0f1117';
+  if(map.getLayer('lbl-place')){ map.setPaintProperty('lbl-place','text-color', isLight?'#1f2433':'#eef1f6'); map.setPaintProperty('lbl-place','text-halo-color',halo); }
+  if(map.getLayer('lbl-water')){ map.setPaintProperty('lbl-water','text-color', isLight?'#1c4f8a':'#8fb6e0'); map.setPaintProperty('lbl-water','text-halo-color',halo); }
 }
-document.getElementById('b-scheme').onclick = () => setBase(false);
-document.getElementById('b-sat').onclick = () => setBase(true);
+function setBase(which){
+  ['light','base','sat'].forEach(l=>{ if(map.getLayer(l)) map.setLayoutProperty(l,'visibility',
+    ((which==='light'&&l==='light')||(which==='dark'&&l==='base')||(which==='sat'&&l==='sat'))?'visible':'none'); });
+  setBaseLabels(which==='light');
+  document.querySelectorAll('#hud .bt[data-b]').forEach(b=>b.classList.toggle('on', b.dataset.b===which));
+}
+document.querySelectorAll('#hud .bt[data-b]').forEach(b=>b.onclick=()=>setBase(b.dataset.b));
 
 // ── Полный попап участка: индекс советов + point-in-polygon по оригиналам + ленивая подгрузка ──
 const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
@@ -240,6 +245,7 @@ map.on('load', ()=>{
   map.addSource('basket',{type:'geojson',data:EMPTY});
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
+  setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
 });
 
 // Рамка-выделение: Shift+перетаскивание
