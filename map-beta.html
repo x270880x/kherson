@@ -33,6 +33,10 @@
   .qrow:last-child{border-bottom:none}
   .qrow:hover{background:#1f2433}
   .qrow.muted{color:#8b91a8;cursor:default}
+  #basket{position:absolute;left:10px;bottom:14px;z-index:6;display:flex;align-items:center;gap:8px;background:rgba(15,17,23,.9);border:1px solid #2a2f42;border-radius:8px;padding:7px 11px;color:#d8dce8;font-size:12px}
+  #basket b{color:#e8c547}
+  #basket button{background:transparent;border:1px solid #2a2f42;color:#d8dce8;font-size:11px;padding:3px 8px;border-radius:5px;cursor:pointer}
+  #basket button:hover{border-color:#e8c547;color:#e8c547}
 </style>
 </head>
 <body>
@@ -40,7 +44,7 @@
 <div id="hud">
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
-  <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности на всей карте.</div>
+  <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
   <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
@@ -48,6 +52,7 @@
 </div>
 <div id="zoomctl"><button id="zin" aria-label="Приблизить">+</button><button id="zout" aria-label="Отдалить">−</button></div>
 <div id="search"><input id="q" type="text" placeholder="Село или кадастр 6520…:01:001:0001" autocomplete="off"/><div id="qres"></div></div>
+<div id="basket">📌 <b id="bk-count">0</b> уч. <button id="bk-exp">CSV</button><button id="bk-clr">Очистить</button></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 const OWN = { p:['Частная','#4caf7d'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e05252'] };
@@ -110,17 +115,21 @@ function popupHTML(rec, cname){
   if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</div></div>';
   return h+'</div>';
 }
+let boxDragged=false;
 map.on('click', 'parcels-fill', async e => {
-  const x=e.lngLat.lng, y=e.lngLat.lat;
-  const popup=new maplibregl.Popup({maxWidth:'320px'}).setLngLat(e.lngLat).setHTML('<span style="font-size:12px;color:#8b91a8">загрузка…</span>').addTo(map);
+  if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
+  const x=e.lngLat.lng, y=e.lngLat.lat, shift=e.originalEvent && e.originalEvent.shiftKey;
+  const popup = shift ? null : new maplibregl.Popup({maxWidth:'320px'}).setLngLat(e.lngLat).setHTML('<span style="font-size:12px;color:#8b91a8">загрузка…</span>').addTo(map);
   const near=CIDX.filter(c=>Math.abs(c.lat-y)<0.25&&Math.abs(c.lon-x)<0.3).sort((a,b)=>((a.lat-y)**2+(a.lon-x)**2)-((b.lat-y)**2+(b.lon-x)**2)).slice(0,4);
   for(const c of near){
     const feats=await rawFeats(c.c);
     const hit=feats.find(f=>f.geometry&&geomHas(f.geometry,x,y));
-    if(hit){ const cad=hit.properties.cadnum; const rec=(await councilParcels(c.c)).find(p=>p.c===cad)||{c:cad}; popup.setHTML(popupHTML(rec, ruName(c.n))); return; }
+    if(hit){ const cad=hit.properties.cadnum; const rec=(await councilParcels(c.c)).find(p=>p.c===cad)||{c:cad};
+      if(shift) basketToggle(cad, hit.geometry, rec, ruName(c.n));
+      else popup.setHTML(popupHTML(rec, ruName(c.n)));
+      return; }
   }
-  const o=OWN[e.features[0].properties.o]||['—','#888'];
-  popup.setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b><div style="color:#8b91a8;font-size:10px;margin-top:2px">точный участок не найден</div></div>');
+  if(!shift){ const o=OWN[e.features[0].properties.o]||['—','#888']; popup.setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b><div style="color:#8b91a8;font-size:10px;margin-top:2px">точный участок не найден</div></div>'); }
 });
 map.on('mouseenter','parcels-fill',()=>map.getCanvas().style.cursor='pointer');
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
@@ -167,6 +176,51 @@ qEl.addEventListener('input', ()=>{
 });
 qres.addEventListener('click', e=>{ const r=e.target.closest('.qrow[data-i]'); if(r){ const c=CIDX[+r.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; } });
 qEl.addEventListener('keydown', e=>{ if(e.key!=='Enter') return; const m=qEl.value.match(CAD_RE); if(m){ flyCad(m[0]); return; } const first=qres.querySelector('.qrow[data-i]'); if(first){ const c=CIDX[+first.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; } });
+
+// ── Подборка участков ──
+const basket = new Map();   // cadnum → {geom, rec, cname}
+function basketRefresh(){
+  const fc={type:'FeatureCollection',features:[...basket.values()].map(v=>({type:'Feature',geometry:v.geom,properties:{}}))};
+  const s=map.getSource('basket'); if(s) s.setData(fc);
+  document.getElementById('bk-count').textContent=basket.size;
+}
+function basketToggle(cad, geom, rec, cname){
+  if(basket.has(cad)) basket.delete(cad); else basket.set(cad,{geom,rec,cname});
+  basketRefresh();
+}
+map.on('load', ()=>{
+  map.addSource('basket',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
+  map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
+});
+
+// Рамка-выделение: Shift+перетаскивание
+map.boxZoom.disable();
+let bs=null, bsRect=null;
+map.on('mousedown', e=>{ if(!e.originalEvent.shiftKey) return; bs={x:e.point.x,y:e.point.y,ll:e.lngLat}; map.dragPan.disable(); });
+map.on('mousemove', e=>{ if(!bs) return; if(!bsRect){ bsRect=document.createElement('div'); document.body.appendChild(bsRect); } const x0=Math.min(bs.x,e.point.x),y0=Math.min(bs.y,e.point.y),w=Math.abs(e.point.x-bs.x),h=Math.abs(e.point.y-bs.y); const r=map.getCanvas().getBoundingClientRect(); bsRect.style.cssText='position:fixed;border:1px dashed #e8c547;background:rgba(232,197,71,.12);z-index:7;pointer-events:none;left:'+(r.left+x0)+'px;top:'+(r.top+y0)+'px;width:'+w+'px;height:'+h+'px'; });
+map.on('mouseup', async e=>{
+  const start=bs, rect=bsRect; bs=null; bsRect=null; map.dragPan.enable(); if(rect) rect.remove();
+  if(!start) return;
+  if(Math.abs(e.point.x-start.x)<4 && Math.abs(e.point.y-start.y)<4) return;  // это клик, не рамка
+  boxDragged=true;
+  const a=start.ll,b=e.lngLat; const minx=Math.min(a.lng,b.lng),maxx=Math.max(a.lng,b.lng),miny=Math.min(a.lat,b.lat),maxy=Math.max(a.lat,b.lat);
+  const cs=CIDX.filter(c=>c.lat>=miny-0.05&&c.lat<=maxy+0.05&&c.lon>=minx-0.05&&c.lon<=maxx+0.05).slice(0,12);
+  for(const c of cs){ const feats=await rawFeats(c.c); const ri={}; (await councilParcels(c.c)).forEach(p=>ri[p.c]=p);
+    for(const f of feats){ const g=f.geometry; if(!g) continue; const ring=g.type==='Polygon'?g.coordinates[0]:g.coordinates[0][0]; let sx=0,sy=0; ring.forEach(p=>{sx+=p[0];sy+=p[1];}); const cx=sx/ring.length, cy=sy/ring.length;
+      if(cx>=minx&&cx<=maxx&&cy>=miny&&cy<=maxy){ const cad=f.properties.cadnum; if(!basket.has(cad)) basket.set(cad,{geom:g,rec:ri[cad]||{c:cad},cname:ruName(c.n)}); } }
+  }
+  basketRefresh();
+});
+
+document.getElementById('bk-clr').onclick=()=>{ basket.clear(); basketRefresh(); };
+document.getElementById('bk-exp').onclick=()=>{
+  if(!basket.size) return;
+  const rows=[['cadnum','area_ga','ownership','council','renter','owner']];
+  for(const [cad,v] of basket){ const r=v.rec||{}; rows.push([cad, r.a==null?'':r.a, OTC[r.ot]?OTC[r.ot][0]:(r.ot||''), v.cname||'', r.r||'', r.o||'']); }
+  const csv='﻿'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(';')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='podborka.csv'; a.click(); URL.revokeObjectURL(a.href);
+};
 </script>
 </body>
 </html>
