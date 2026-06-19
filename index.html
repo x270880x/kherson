@@ -47,9 +47,9 @@
     border-bottom: 2px solid var(--accent);
     padding: 12px 24px;
     background: linear-gradient(180deg, #0d1520 0%, var(--bg) 100%);
-    display: flex; justify-content: flex-start; align-items: center; gap: 28px; flex-shrink: 0;
+    display: flex; justify-content: flex-start; align-items: center; gap: 5px; flex-shrink: 0;
   }
-  header .gerb { height: 55px; width: auto; flex-shrink: 0; margin-right: -14px; }
+  header .gerb { height: 55px; width: auto; flex-shrink: 0; }
   header .left .label {
     font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
@@ -1916,7 +1916,7 @@ const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
 map.fitBounds(bounds, { padding: [40, 40] });
 // старт на ~15% ближе: целочисленный фит + log2(1.155)
 map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.274), { animate: false });
-map.panBy([Math.round(window.innerWidth * 0.24), 0], { animate: false });
+map.panBy([Math.round(window.innerWidth * 0.18), 0], { animate: false });
 map.setMinZoom(map.getZoom());   // нельзя зумаут дальше стартового кадра
 // Блокировка пана на стартовом зуме: тащить карту нельзя, пока не приблизишь (клик по селу/поиск приближают ПРОГРАММНО — работают всегда)
 function applyPanLock(){ if(map.getZoom() <= map.getMinZoom()+0.05) map.dragging.disable(); else map.dragging.enable(); }
