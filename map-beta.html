@@ -119,23 +119,22 @@ function updateZoutBtn(){ const dis=map.getZoom()<=map.getMinZoom()+0.05; zoutBt
 map.on('zoom', updateZoutBtn);
 
 // ── Титул региона: герб + «Херсонская область» — фиксированный оверлей по центру канваса ──
-const TITLE_FADE = [8.6, 10.0];              // zoom: ≤8.6 — видно полностью, ≥10 — скрыто
+const TITLE_AWAY_ZOOM = 8.6;                 // zoom: ≤ — титул по центру (×3); > — плавно улетает в правый верхний угол и тает
 const regionTitleEl = document.createElement('div');
 regionTitleEl.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;pointer-events:none';
 regionTitleEl.innerHTML =
-  '<div class="rt-inner" style="display:flex;align-items:center;gap:4px;white-space:nowrap;transition:opacity .25s ease">' +
-    '<img src="gerb.svg" alt="" style="height:19px;width:auto;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">' +
-    '<span class="rt-text" style="font:700 13px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
+  '<div class="rt-inner" style="display:flex;align-items:center;gap:12px;white-space:nowrap;will-change:transform,opacity;transition:transform .8s cubic-bezier(.4,0,.2,1), opacity .7s ease">' +
+    '<img src="gerb.svg" alt="" style="height:57px;width:auto;flex-shrink:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">' +
+    '<span class="rt-text" style="font:800 39px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
   '</div>';
 const regionTitleInner = regionTitleEl.querySelector('.rt-inner');
 const regionTitleText = regionTitleEl.querySelector('.rt-text');
 document.getElementById('map').appendChild(regionTitleEl);
 function updateRegionTitle(isLight){
   if (isLight === undefined) isLight = document.querySelector('#hud .bt[data-b="light"]').classList.contains('on');
-  const z = map.getZoom(), [a,b] = TITLE_FADE;
-  const op = z <= a ? 1 : z >= b ? 0 : 1 - (z - a) / (b - a);
-  regionTitleInner.style.opacity = op;
-  regionTitleInner.style.visibility = op < 0.02 ? 'hidden' : 'visible';
+  const away = map.getZoom() > TITLE_AWAY_ZOOM;   // при приближении — улетает в правый верхний угол и тает
+  regionTitleInner.style.transform = away ? 'translate(44vw,-42vh) scale(.4)' : 'translate(0,0) scale(1)';
+  regionTitleInner.style.opacity = away ? '0' : '1';
   regionTitleText.style.color = isLight ? '#1a2740' : '#eef1f6';
   regionTitleText.style.textShadow = isLight
     ? '0 1px 4px rgba(255,255,255,.95), 0 0 12px rgba(255,255,255,.8)'
@@ -217,7 +216,7 @@ map.on('mousemove','parcels-fill',e=>{ if(pfQueued) return; pfQueued=true; reque
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
 
 // Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
-const PLACE_ZOOM={ city:11, town:12, village:13, hamlet:14, state:9 };
+const PLACE_ZOOM={ city:10, town:11, village:12, hamlet:13, state:9 };
 map.on('click','lbl-place', e=>{
   const f=e.features&&e.features[0]; if(!f) return;
   const z=Math.max(map.getZoom(), PLACE_ZOOM[f.properties.class]||13);
