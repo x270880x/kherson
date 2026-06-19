@@ -122,6 +122,9 @@ document.getElementById('zout').onclick = () => zoomStep(-0.35);
 const zoutBtn = document.getElementById('zout');
 function updateZoutBtn(){ const dis=map.getZoom()<=map.getMinZoom()+0.05; zoutBtn.style.opacity=dis?'.3':''; zoutBtn.style.pointerEvents=dis?'none':''; }
 map.on('zoom', updateZoutBtn);
+// Блокировка пана на стартовом зуме: тащить карту нельзя, пока не приблизишь (клик по селу/поиск приближают ПРОГРАММНО — работают всегда)
+function applyPanLock(){ if(map.getZoom() <= map.getMinZoom()+0.05) map.dragPan.disable(); else map.dragPan.enable(); }
+map.on('zoomend', applyPanLock);
 
 // ── Титул региона: герб + «Херсонская область» — фиксированный оверлей по центру канваса ──
 const TITLE_AWAY_ZOOM = 8.6;                 // zoom: ≤ — титул по центру; > — уезжает в правый верхний угол и остаётся там
@@ -381,7 +384,7 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
   map.fitBounds(KHERSON_BOUNDS, { padding: 12, duration: 0 });   // гарантируем кадр на всю область (после раскладки контейнера)
-  map.once('idle', ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); });
+  map.once('idle', ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); applyPanLock(); });
 });
 
 // Рамка-выделение: Shift+перетаскивание
@@ -390,7 +393,7 @@ let bs=null, bsRect=null;
 map.on('mousedown', e=>{ if(!e.originalEvent.shiftKey) return; bs={x:e.point.x,y:e.point.y,ll:e.lngLat}; map.dragPan.disable(); });
 map.on('mousemove', e=>{ if(!bs) return; if(!bsRect){ bsRect=document.createElement('div'); document.body.appendChild(bsRect); } const x0=Math.min(bs.x,e.point.x),y0=Math.min(bs.y,e.point.y),w=Math.abs(e.point.x-bs.x),h=Math.abs(e.point.y-bs.y); const r=map.getCanvas().getBoundingClientRect(); bsRect.style.cssText='position:fixed;border:1px dashed #e8c547;background:rgba(232,197,71,.12);z-index:7;pointer-events:none;left:'+(r.left+x0)+'px;top:'+(r.top+y0)+'px;width:'+w+'px;height:'+h+'px'; });
 map.on('mouseup', async e=>{
-  const start=bs, rect=bsRect; bs=null; bsRect=null; map.dragPan.enable(); if(rect) rect.remove();
+  const start=bs, rect=bsRect; bs=null; bsRect=null; applyPanLock(); if(rect) rect.remove();
   if(!start) return;
   if(Math.abs(e.point.x-start.x)<4 && Math.abs(e.point.y-start.y)<4) return;  // это клик, не рамка
   boxDragged=true;

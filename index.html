@@ -1616,7 +1616,7 @@ function toggleBasketBtn(btn, cadnum) {
         });
       }
       map.removeLayer(rect);
-      map.dragging.enable();
+      applyPanLock();
       basketUpdate();
     }
     start = null; dragging = false; rect = null;
@@ -1912,6 +1912,10 @@ map.fitBounds(bounds, { padding: [40, 40] });
 map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.274), { animate: false });
 map.panBy([Math.round(window.innerWidth * 0.24), 0], { animate: false });
 map.setMinZoom(map.getZoom());   // нельзя зумаут дальше стартового кадра
+// Блокировка пана на стартовом зуме: тащить карту нельзя, пока не приблизишь (клик по селу/поиск приближают ПРОГРАММНО — работают всегда)
+function applyPanLock(){ if(map.getZoom() <= map.getMinZoom()+0.05) map.dragging.disable(); else map.dragging.enable(); }
+map.on('zoomend', applyPanLock);
+applyPanLock();
 </script>
 </body>
 </html>
