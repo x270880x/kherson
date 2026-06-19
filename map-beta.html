@@ -24,6 +24,15 @@
   #zoomctl button{width:34px;height:34px;background:rgba(15,17,23,.9);border:1px solid #2a2f42;color:#e8e8ea;font-size:20px;line-height:1;cursor:pointer;border-radius:6px}
   #zoomctl button:hover{border-color:#e8c547;color:#e8c547}
   #zoomctl button:active{transform:scale(.94)}
+  #search{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:6;width:300px;max-width:60vw}
+  #search input{width:100%;box-sizing:border-box;background:rgba(15,17,23,.92);border:1px solid #2a2f42;border-radius:7px;color:#e8e8ea;font-size:13px;padding:8px 11px;outline:none}
+  #search input:focus{border-color:#e8c547}
+  #qres{margin-top:3px;background:rgba(15,17,23,.96);border:1px solid #2a2f42;border-radius:7px;overflow:hidden}
+  #qres:empty{display:none}
+  .qrow{padding:7px 11px;font-size:12px;color:#e8e8ea;cursor:pointer;border-bottom:1px solid #20242f}
+  .qrow:last-child{border-bottom:none}
+  .qrow:hover{background:#1f2433}
+  .qrow.muted{color:#8b91a8;cursor:default}
 </style>
 </head>
 <body>
@@ -38,6 +47,7 @@
   <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#e05252"></span>Не определено</label>
 </div>
 <div id="zoomctl"><button id="zin" aria-label="Приблизить">+</button><button id="zout" aria-label="Отдалить">−</button></div>
+<div id="search"><input id="q" type="text" placeholder="Село или кадастр 6520…:01:001:0001" autocomplete="off"/><div id="qres"></div></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 const OWN = { p:['Частная','#4caf7d'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e05252'] };
@@ -129,6 +139,34 @@ document.querySelectorAll('#hud .leg[data-o]').forEach(lab => {
     applyOwnFilter();
   });
 });
+
+// ── Поиск: село (рус/укр) или кадастровый номер ──
+const qEl=document.getElementById('q'), qres=document.getElementById('qres');
+const CAD_RE=/\d{10}:\d{2}:\d{3}:\d{4}/;
+function flyCouncil(c){ map.jumpTo({center:[c.lon,c.lat], zoom:13}); }
+async function flyCad(cad){
+  const code=cad.slice(0,10), c=CIDX.find(x=>x.c===code);
+  if(!c){ qres.innerHTML='<div class="qrow muted">совет не найден</div>'; return; }
+  map.jumpTo({center:[c.lon,c.lat], zoom:15});
+  const f=(await rawFeats(code)).find(ff=>ff.properties.cadnum===cad);
+  if(f){
+    const ring=f.geometry.type==='Polygon'?f.geometry.coordinates[0]:f.geometry.coordinates[0][0];
+    let sx=0,sy=0; ring.forEach(p=>{sx+=p[0];sy+=p[1];}); const cx=sx/ring.length, cy=sy/ring.length;
+    map.jumpTo({center:[cx,cy], zoom:17});
+    const rec=(await councilParcels(code)).find(p=>p.c===cad)||{c:cad};
+    new maplibregl.Popup({maxWidth:'320px'}).setLngLat([cx,cy]).setHTML(popupHTML(rec, ruName(c.n))).addTo(map);
+    qres.innerHTML='';
+  } else qres.innerHTML='<div class="qrow muted">участок не найден в совете</div>';
+}
+qEl.addEventListener('input', ()=>{
+  const v=qEl.value.trim(); if(!v){ qres.innerHTML=''; return; }
+  if(CAD_RE.test(v)){ qres.innerHTML='<div class="qrow muted">↵ Enter — найти участок</div>'; return; }
+  const low=v.toLowerCase();
+  const hits=CIDX.map((c,i)=>({c,i})).filter(o=>ruName(o.c.n).toLowerCase().includes(low)||(o.c.n||'').toLowerCase().includes(low)).slice(0,8);
+  qres.innerHTML = hits.length ? hits.map(o=>'<div class="qrow" data-i="'+o.i+'">'+esc(ruName(o.c.n))+'</div>').join('') : '<div class="qrow muted">ничего не найдено</div>';
+});
+qres.addEventListener('click', e=>{ const r=e.target.closest('.qrow[data-i]'); if(r){ const c=CIDX[+r.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; } });
+qEl.addEventListener('keydown', e=>{ if(e.key!=='Enter') return; const m=qEl.value.match(CAD_RE); if(m){ flyCad(m[0]); return; } const first=qres.querySelector('.qrow[data-i]'); if(first){ const c=CIDX[+first.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; } });
 </script>
 </body>
 </html>
