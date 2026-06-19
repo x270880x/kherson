@@ -95,10 +95,7 @@ const map = new maplibregl.Map({
       { id:'light', type:'raster', source:'light' },
       { id:'base', type:'raster', source:'base', layout:{visibility:'none'} },
       { id:'sat', type:'raster', source:'sat', layout:{visibility:'none'} },
-      { id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
-        paint:{ 'fill-color':['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e05252','#888888'], 'fill-opacity':0.55, 'fill-antialias':false } },
-      { id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
-        paint:{ 'line-color':'#11141d', 'line-width':0.4 } },
+      // parcels-fill / parcels-line добавляются отложенно (addParcels) — сначала рисуется подложка
       { id:'lbl-water', type:'symbol', source:'omt', 'source-layer':'water_name',
         layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name']], 'text-font':['Noto Sans Italic'], 'text-size':['interpolate',['linear'],['zoom'],6,10,12,15], 'text-max-width':8 },
         paint:{ 'text-color':'#8fb6e0', 'text-halo-color':'#0f1117', 'text-halo-width':1.1 } },
@@ -140,12 +137,16 @@ const PRE={'смт':'пгт','пгт':'пгт','м.':'г.','с.':'с.','х.':'х
 function ruName(name){ const m=(name||'').match(/^(.*?)\s*\(([^)]+)\)\s*$/); if(!m) return name||''; const ua=m[1].trim(); const pm=ua.match(/^(смт|пгт|с\.|х\.|м\.)\s+/i); const pre=pm?((PRE[pm[1].toLowerCase()]||pm[1])+' '):''; return pre+m[2].trim(); }
 function ptInRing(x,y,r){ let inside=false; for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1]; if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
 function geomHas(g,x,y){ const f=rr=>ptInRing(x,y,rr[0])&&!rr.slice(1).some(h=>ptInRing(x,y,h)); if(g.type==='Polygon')return f(g.coordinates); if(g.type==='MultiPolygon')return g.coordinates.some(f); return false; }
-const OTC={'Приватна власність':['Частная','#4caf7d'],'Комунальна власність':['Коммунальная','#e8c547'],'Державна власність':['Государственная','#4a9eff'],'Не визначено':['Не определено','#e05252']};
+// Район РФ по кадастровому коду (как в основной карте) — code[2:5] → район
+const RAION_BY_PREFIX={"101":"город Херсон","104":"Каховский район","107":"город Новая Каховка","201":"город Херсон","203":"Белозёрский район","206":"Бериславский район","209":"Великоалександровский район","211":"Генический район","212":"Великолепетихский район","215":"Верхнерогачикский район","221":"Генический район","223":"Голопристанский район","226":"Горностаевский район","229":"Ивановский район","232":"Каланчакский район","235":"Каховский район","238":"Нижнесерогозский район","241":"Нововоронцовский район","244":"Новотроицкий район","247":"Скадовский район","250":"Алешкинский район","254":"Чаплынский район"};
+const raionOf=code=>RAION_BY_PREFIX[(code||'').slice(2,5)]||'';
+const OTC={'Приватна власність':['Частная собственность','#4caf7d'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#e05252']};
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function popupHTML(rec, cname){
   const ot=OTC[rec.ot]||['—','#888']; let h='<div style="font-size:12px;line-height:1.5;max-width:300px;color:#e8e8ea">';
   h+='<div style="font-family:ui-monospace,monospace;color:#e8c547;font-weight:600;word-break:break-all">'+esc(rec.c)+'</div>';
   h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px">'+(rec.a!=null?rec.a+' га':'')+(cname?' · '+esc(cname):'')+'</div>';
+  const rai=raionOf(rec.c); if(rai) h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px;margin-top:-2px">'+esc(rai)+'</div>';
   if(rec.r) h+='<div><span style="color:#8b91a8">аренд.:</span> '+esc(rec.r)+'</div>';
   if(rec.o) h+='<div><span style="color:#8b91a8">собств.:</span> '+esc(rec.o)+'</div>';
   if(rec.ed) h+='<div><span style="color:#8b91a8">договор до:</span> '+esc(rec.ed)+(rec.cn?' · №'+esc(rec.cn):'')+'</div>';
@@ -169,7 +170,16 @@ map.on('click', 'parcels-fill', async e => {
   }
   if(!shift){ const o=OWN[e.features[0].properties.o]||['—','#888']; popup.setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b><div style="color:#8b91a8;font-size:10px;margin-top:2px">точный участок не найден</div></div>'); }
 });
-map.on('mouseenter','parcels-fill',()=>map.getCanvas().style.cursor='pointer');
+// Предзагрузка данных ближайшего совета при наведении → клик по участку открывается из кэша (быстрый попап)
+let lastPf='', pfQueued=false;
+function prefetchNear(ll){
+  if(!CIDX.length) return;
+  let best=null,bd=1e9; for(const c of CIDX){ const d=(c.lat-ll.lat)**2+(c.lon-ll.lng)**2; if(d<bd){bd=d;best=c;} }
+  if(!best || best.c===lastPf) return; lastPf=best.c;
+  rawFeats(best.c); councilParcels(best.c);   // прогрев кэша pfCache/cjCache (промис игнорируем)
+}
+map.on('mouseenter','parcels-fill',e=>{ map.getCanvas().style.cursor='pointer'; prefetchNear(e.lngLat); });
+map.on('mousemove','parcels-fill',e=>{ if(pfQueued) return; pfQueued=true; requestAnimationFrame(()=>{ pfQueued=false; prefetchNear(e.lngLat); }); });
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
 
 // Переключатели форм собственности — показать/скрыть по ВСЕЙ карте (вкл. частные)
@@ -236,6 +246,17 @@ function basketToggle(cad, geom, rec, cname){
 }
 const OWN_COLOR_EXPR=['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e05252','#888888'];
 const EMPTY={type:'FeatureCollection',features:[]};
+// Слой участков добавляем отложенно — подложка успевает прорисоваться, тяжёлые .pbf не блокируют первый кадр
+let parcelsAdded=false;
+function addParcels(){
+  if(parcelsAdded || !map.getSource('parcels')) return; parcelsAdded=true;
+  const before = map.getLayer('fine-fill') ? 'fine-fill' : undefined;
+  map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
+    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':0.55, 'fill-antialias':false } }, before);
+  map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
+    paint:{ 'line-color':'#11141d', 'line-width':0.4 } }, before);
+  applyOwnFilter();
+}
 map.on('load', ()=>{
   // оверлей отфильтрованных участков (гибрид: подгрузка по зуму)
   map.addSource('fine',{type:'geojson',data:EMPTY});
@@ -246,6 +267,8 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
+  map.once('idle', addParcels);   // подложка отрисована → подгружаем участки
+  setTimeout(addParcels, 2000);   // подстраховка, если idle задержится
 });
 
 // Рамка-выделение: Shift+перетаскивание
@@ -292,8 +315,8 @@ async function fineUpdate(){
     do{
       finePend=false;
       const overlay = hasFine() && map.getZoom()>=FINE_MINZOOM;
-      map.setLayoutProperty('parcels-fill','visibility', overlay?'none':'visible');
-      map.setLayoutProperty('parcels-line','visibility', overlay?'none':'visible');
+      if(map.getLayer('parcels-fill')) map.setLayoutProperty('parcels-fill','visibility', overlay?'none':'visible');
+      if(map.getLayer('parcels-line')) map.setLayoutProperty('parcels-line','visibility', overlay?'none':'visible');
       if(!hasFine()){ map.getSource('fine')&&map.getSource('fine').setData(EMPTY); fineHint(''); break; }
       if(!overlay){ map.getSource('fine')&&map.getSource('fine').setData(EMPTY); fineHint('Приблизьте, чтобы применить фильтр'); break; }
       fineHint('');
