@@ -52,7 +52,11 @@
   <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
   <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#e05252"></span>Не определено</label>
   <div style="margin-top:8px;border-top:1px solid #20242f;padding-top:7px">
-    <span style="color:#8b91a8">Межевание (РФ кадастр):</span>
+    <span style="color:#8b91a8">Категория земель:</span>
+    <select id="f-ct"><option value="">все</option></select>
+    <span style="color:#8b91a8;display:block;margin-top:5px">Год аренды (до):</span>
+    <select id="f-ly"><option value="">все</option><option value="none">без аренды</option><option value="expired">истёкшие (до 2026)</option></select>
+    <span style="color:#8b91a8;display:block;margin-top:5px">Межевание (РФ кадастр):</span>
     <select id="f-mz"><option value="">все</option><option value="yes">только размежёванные</option><option value="no">только без межевания</option></select>
   </div>
 </div>
@@ -239,8 +243,9 @@ document.getElementById('bk-exp').onclick=()=>{
 
 // ── Тонкие фильтры (гибрид): при приближении грузим данные совета и показываем только подходящие ──
 const OTC2={'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n'};
-const fine={ mz:'' };               // '' | 'yes' | 'no'
-function hasFine(){ return !!fine.mz; }
+const fine={ mz:'', ct:'', ly:'' };  // межевание | категория | год аренды
+function hasFine(){ return !!(fine.mz||fine.ct||fine.ly); }
+function matchLease(rec){ const y=rec.ey; if(fine.ly==='none') return !y; if(fine.ly==='expired') return y&&y<2026; if(fine.ly==='2030+') return y&&y>=2030; return y&&String(y)===fine.ly; }
 const FINE_MINZOOM=13;
 function fineHint(t){ const el=document.getElementById('fine-hint'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; }
 let fineRun=false, finePend=false;
@@ -263,6 +268,8 @@ async function fineUpdate(){
         for(const f of fs){ const rec=ri[f.properties.cadnum]; if(!rec||!f.geometry) continue;
           const oc=OTC2[rec.ot]||'n';
           if(!ownActive.has(oc)) continue;
+          if(fine.ct && rec.ct!==fine.ct) continue;
+          if(fine.ly && !matchLease(rec)) continue;
           if(fine.mz==='yes' && !rec.mz) continue;
           if(fine.mz==='no' && rec.mz) continue;
           feats.push({type:'Feature',geometry:f.geometry,properties:{o:oc}}); }
@@ -272,6 +279,14 @@ async function fineUpdate(){
   } finally { fineRun=false; }
 }
 document.getElementById('f-mz').addEventListener('change', e=>{ fine.mz=e.target.value; fineUpdate(); });
+document.getElementById('f-ct').addEventListener('change', e=>{ fine.ct=e.target.value; fineUpdate(); });
+document.getElementById('f-ly').addEventListener('change', e=>{ fine.ly=e.target.value; fineUpdate(); });
+fetch(BASE+'filters-beta.json').then(r=>r.json()).then(F=>{
+  const ct=document.getElementById('f-ct');
+  (F.categories||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c.length>52?c.slice(0,50)+'…':c; ct.appendChild(o); });
+  const ly=document.getElementById('f-ly');
+  (F.lease_years||[]).slice().sort((a,b)=>b-a).forEach(y=>{ const o=document.createElement('option'); o.value=String(y); o.textContent='до '+y; ly.appendChild(o); });
+}).catch(()=>{});
 map.on('moveend', ()=>{ if(hasFine()) fineUpdate(); });
 </script>
 </body>
