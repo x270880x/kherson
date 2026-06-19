@@ -145,11 +145,9 @@ function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 function popupHTML(rec, cname){
   const ot=OTC[rec.ot]||['—','#888']; let h='<div style="font-size:12px;line-height:1.5;max-width:300px;color:#e8e8ea">';
   h+='<div style="font-family:ui-monospace,monospace;color:#e8c547;font-weight:600;word-break:break-all">'+esc(rec.c)+'</div>';
-  h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px">'+(rec.a!=null?rec.a+' га':'')+(cname?' · '+esc(cname):'')+'</div>';
+  h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px">'+(cname?esc(cname):'')+(rec.a!=null?(cname?' · ':'')+rec.a+' га':'')+'</div>';
   const rai=raionOf(rec.c); if(rai) h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px;margin-top:-2px">'+esc(rai)+'</div>';
-  if(rec.r) h+='<div><span style="color:#8b91a8">аренд.:</span> '+esc(rec.r)+'</div>';
   if(rec.o) h+='<div><span style="color:#8b91a8">собств.:</span> '+esc(rec.o)+'</div>';
-  if(rec.ed) h+='<div><span style="color:#8b91a8">договор до:</span> '+esc(rec.ed)+(rec.cn?' · №'+esc(rec.cn):'')+'</div>';
   h+='<div style="color:'+ot[1]+';font-size:10px;margin-top:4px">'+ot[0]+'</div>';
   if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</div></div>';
   return h+'</div>';
