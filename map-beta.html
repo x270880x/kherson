@@ -111,9 +111,9 @@ const map = new maplibregl.Map({
 });
 
 const zc = document.getElementById('zoomctl');
-const zoomStep = d => map.easeTo({ zoom: map.getZoom() + d, duration: 220, easing: t => t*(2-t) });
-document.getElementById('zin').onclick  = () => zoomStep(+0.5);
-document.getElementById('zout').onclick = () => zoomStep(-0.5);
+const zoomStep = d => map.easeTo({ zoom: map.getZoom() + d, duration: 320, easing: t => t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2 });
+document.getElementById('zin').onclick  = () => zoomStep(+0.35);
+document.getElementById('zout').onclick = () => zoomStep(-0.35);
 
 // Переключатель подложки: светлая (voyager) / тёмная (CARTO dark) / спутник (Esri)
 function setBaseLabels(isLight){
