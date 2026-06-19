@@ -190,12 +190,14 @@ function addCouncilLabels(){
   // районный центр = главное (макс. участков) урбан-НП района; если урбан нет — макс. участков
   const centers=new Set(), byR={};
   for(const c of pts){ const r=raionOf(c.c); if(r) (byR[r]=byR[r]||[]).push(c); }
-  for(const r in byR){ if(r==='город Херсон') continue;   // Херсон добавлен вручную — не метим центром пригород (Зеленівку)
+  for(const r in byR){ if(r==='город Херсон'||r==='Верхнерогачикский район') continue;   // Херсон и Верхній Рогачик добавлены вручную — не метим центром село (Зеленівку / Зелене)
     const g=byR[r], urb=g.filter(c=>isUrban(c.n)), pool=urb.length?urb:g;
     const best=pool.reduce((a,b)=>(+b.total||0)>(+a.total||0)?b:a); if(best) centers.add(best.c); }
   const feats=pts.map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n),total:c.total||0,ctr:centers.has(c.c),big:BIG_TOWNS.has(c.c)}}));
   // Херсон (~280k) отсутствует в данных как единый НП — добавляем вручную как центр (на обзоре виден)
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★ Херсон',total:999999,ctr:true,big:true,capital:true}});
+  // Верхній Рогачик (центр Верхнерогачикского р-на) отсутствует в данных — добавляем вручную как центр
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true}});
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
   // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
   map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:10, filter:['!',['get','ctr']],
@@ -213,7 +215,7 @@ function addCouncilLabels(){
   map.setPaintProperty('lbl-place','text-opacity',['case',['in',nm,['literal',OUT_OF_REGION]],0.4,['within',hull],1,0.4]);
   // (2) Убрать ДУБЛИ: вырезаем из OMT lbl-place названия, которые рисуем сами (центры/советы) — по name:ru, не по позиции
   const bareRu=n=>{ const m=(n||'').match(/\(([^)]+)\)\s*$/); return m?m[1].trim():(n||''); };
-  const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон'])];
+  const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон','Верхний Рогачик','Верхній Рогачик'])];
   map.setFilter('lbl-place',['all',['in',['get','class'],['literal',['county','city','town','village','hamlet']]],['!',['in',nm,['literal',ourNames]]]]);
   setBaseLabels(document.querySelector('#hud .bt[data-b="light"]').classList.contains('on'));
 }
