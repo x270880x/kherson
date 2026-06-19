@@ -320,14 +320,18 @@ const EMPTY={type:'FeatureCollection',features:[]};
 // Слой участков добавляем отложенно — подложка успевает прорисоваться, тяжёлые .pbf не блокируют первый кадр
 let parcelsAdded=false;
 function addParcels(){
-  if(parcelsAdded || !map.getSource('parcels')) return; parcelsAdded=true;
-  const before = map.getLayer('lbl-water') ? 'lbl-water' : undefined;   // под подписями; fine/basket добавятся выше
+  if(parcelsAdded || !map.getSource('parcels') || !map.getLayer('lbl-water')) return;   // ждём, пока стиль готов (есть базовый слой)
+  const before = 'lbl-water';   // под подписями; fine/basket добавятся выше
   map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
     paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':0.55, 'fill-antialias':false } }, before);
   map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
     paint:{ 'line-color':'#11141d', 'line-width':0.4 } }, before);
+  parcelsAdded=true;   // флаг только ПОСЛЕ успешного addLayer — иначе повтор на следующем событии стиля
   applyOwnFilter();
 }
+// Участки добавляем на самом раннем готовом стиле, НЕ дожидаясь медленного внешнего слоя подписей omt (из-за которого они раньше появлялись только при зуме).
+// styledata срабатывает как только стиль разобран; addParcels идемпотентен и retry-safe, вызов в load ниже — страховка.
+map.on('styledata', addParcels);
 map.on('load', ()=>{
   addParcels();   // детерминированно: участки добавляются сразу после первого кадра подложки (без зависимости от idle/таймеров)
   // оверлей отфильтрованных участков (гибрид: подгрузка по зуму)
