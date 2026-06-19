@@ -76,10 +76,13 @@
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 const OWN = { p:['Частная','#4caf7d'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e05252'] };
+// Границы всей Херсонской области (по экстенту 337 советов + небольшой запас) — стартовый кадр на весь экран
+const KHERSON_BOUNDS = [[31.80, 45.90], [35.10, 47.45]];   // [[з,ю],[в,с]]
 const map = new maplibregl.Map({
   container: 'map',
   attributionControl: false,
-  center: [33.45, 46.72], zoom: 9, maxZoom: 19,
+  bounds: KHERSON_BOUNDS, fitBoundsOptions: { padding: 12 },
+  maxZoom: 19,
   fadeDuration: 0,
   style: {
     version: 8,
@@ -266,6 +269,7 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
+  map.fitBounds(KHERSON_BOUNDS, { padding: 12, duration: 0 });   // гарантируем кадр на всю область (после раскладки контейнера)
 });
 
 // Рамка-выделение: Shift+перетаскивание
