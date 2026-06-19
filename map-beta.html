@@ -211,6 +211,10 @@ function addCouncilLabels(){
   const OUT_OF_REGION=['Армянск','Армянськ','Красноперекопск','Красноперекопськ'];
   const nm=['coalesce',['get','name:ru'],['get','name:latin'],['get','name']];
   map.setPaintProperty('lbl-place','text-opacity',['case',['in',nm,['literal',OUT_OF_REGION]],0.4,['within',hull],1,0.4]);
+  // (2) Убрать ДУБЛИ: вырезаем из OMT lbl-place названия, которые рисуем сами (центры/советы) — по name:ru, не по позиции
+  const bareRu=n=>{ const m=(n||'').match(/\(([^)]+)\)\s*$/); return m?m[1].trim():(n||''); };
+  const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон'])];
+  map.setFilter('lbl-place',['all',['in',['get','class'],['literal',['county','city','town','village','hamlet']]],['!',['in',nm,['literal',ourNames]]]]);
   setBaseLabels(document.querySelector('#hud .bt[data-b="light"]').classList.contains('on'));
 }
 map.on('styledata', addCouncilLabels);   // если CIDX уже загружен — добавит, как только стиль готов
