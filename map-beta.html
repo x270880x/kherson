@@ -48,9 +48,10 @@ const map = new maplibregl.Map({
   fadeDuration: 0,
   style: {
     version: 8,
-    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
-      base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'], tileSize:256, attribution:'© OpenStreetMap, © CARTO' },
+      base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256, attribution:'© OpenStreetMap, © CARTO' },
+      omt: { type:'vector', url:'https://tiles.openfreemap.org/planet', attribution:'© OpenMapTiles' },
       parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:8, maxzoom:14 }
     },
     layers: [
@@ -58,7 +59,14 @@ const map = new maplibregl.Map({
       { id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
         paint:{ 'fill-color':['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e05252','#888888'], 'fill-opacity':0.55, 'fill-antialias':false } },
       { id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
-        paint:{ 'line-color':'#11141d', 'line-width':0.4 } }
+        paint:{ 'line-color':'#11141d', 'line-width':0.4 } },
+      { id:'lbl-water', type:'symbol', source:'omt', 'source-layer':'water_name',
+        layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name']], 'text-font':['Noto Sans Italic'], 'text-size':['interpolate',['linear'],['zoom'],6,10,12,15], 'text-max-width':8 },
+        paint:{ 'text-color':'#8fb6e0', 'text-halo-color':'#0f1117', 'text-halo-width':1.1 } },
+      { id:'lbl-place', type:'symbol', source:'omt', 'source-layer':'place',
+        filter:['in',['get','class'],['literal',['city','town','village','state']]],
+        layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name:latin'],['get','name']], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['exponential',1.2],['zoom'],6,11,11,15], 'text-max-width':8 },
+        paint:{ 'text-color':'#eef1f6', 'text-halo-color':'#0f1117', 'text-halo-width':1.4 } }
     ]
   }
 });
