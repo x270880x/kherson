@@ -119,27 +119,22 @@ function updateZoutBtn(){ const dis=map.getZoom()<=map.getMinZoom()+0.05; zoutBt
 map.on('zoom', updateZoutBtn);
 
 // ── Титул региона: герб + «Херсонская область» — фиксированный оверлей по центру канваса ──
-const TITLE_AWAY_ZOOM = 8.6;                 // zoom: ≤ — титул по центру (×3); > — плавно улетает в правый верхний угол и тает
+const TITLE_AWAY_ZOOM = 8.6;                 // zoom: ≤ — титул по центру; > — уезжает в правый верхний угол и остаётся там
 const regionTitleEl = document.createElement('div');
 regionTitleEl.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;pointer-events:none';
 regionTitleEl.innerHTML =
-  '<div class="rt-inner" style="display:flex;align-items:center;gap:12px;white-space:nowrap;will-change:transform,opacity">' +
-    '<img src="gerb.svg" alt="" style="height:57px;width:auto;flex-shrink:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">' +
-    '<span class="rt-text" style="font:800 39px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
+  '<div class="rt-inner" style="display:flex;align-items:center;gap:9px;white-space:nowrap;will-change:transform;transition:transform .8s cubic-bezier(.35,0,.2,1)">' +
+    '<img src="gerb.svg" alt="" style="height:40px;width:auto;flex-shrink:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">' +
+    '<span class="rt-text" style="font:800 27px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
   '</div>';
 const regionTitleInner = regionTitleEl.querySelector('.rt-inner');
 const regionTitleText = regionTitleEl.querySelector('.rt-text');
 document.getElementById('map').appendChild(regionTitleEl);
-// Полёт в правый верхний угол — через @keyframes: видно почти весь путь, тает только у угла; возврат в центр — transition
-document.head.insertAdjacentHTML('beforeend', '<style>' +
-  '.rt-inner{transition:transform .5s cubic-bezier(.2,.7,.3,1), opacity .4s ease}' +
-  '.rt-inner.rt-away{animation:rt-fly .95s cubic-bezier(.4,0,.2,1) forwards}' +
-  '@keyframes rt-fly{0%{transform:translate(0,0) scale(1);opacity:1}60%{opacity:1}100%{transform:translate(46vw,-44vh) scale(.4);opacity:0}}' +
-'</style>');
+// Уезжает в правый верхний угол и ОСТАЁТСЯ там видимым: инлайн-transform + статический transition (надёжно анимирует, без затухания)
 function updateRegionTitle(isLight){
   if (isLight === undefined) isLight = document.querySelector('#hud .bt[data-b="light"]').classList.contains('on');
-  const away = map.getZoom() > TITLE_AWAY_ZOOM;   // при приближении — улетает в правый верхний угол и тает
-  regionTitleInner.classList.toggle('rt-away', away);   // полёт через @keyframes (надёжнее transition при частых zoom-событиях)
+  const away = map.getZoom() > TITLE_AWAY_ZOOM;   // при приближении — уезжает в правый верхний угол и остаётся там
+  regionTitleInner.style.transform = away ? 'translate(42vw,-44vh) scale(.62)' : 'translate(0,0) scale(1)';
   regionTitleText.style.color = isLight ? '#1a2740' : '#eef1f6';
   regionTitleText.style.textShadow = isLight
     ? '0 1px 4px rgba(255,255,255,.95), 0 0 12px rgba(255,255,255,.8)'
