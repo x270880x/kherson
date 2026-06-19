@@ -1535,6 +1535,15 @@ function basketUpdate() {
       }
     });
   }
+  // Подсветка подборки на региональных слоях «Вся карта» (gos/kom/nedef)
+  for (const ot in ownRegionLayers) {
+    const layer = ownRegionLayers[ot];
+    if (!map.hasLayer(layer)) continue;
+    layer.eachLayer(l => {
+      if (basket.has(l.feature.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
+      else layer.resetStyle(l);
+    });
+  }
   if (basket.size > 0 || basketView) renderBasketPanel();
 }
 function basketToggle(cadnum) {
@@ -1574,6 +1583,15 @@ function toggleBasketBtn(btn, cadnum) {
       let added = 0;
       for (const code in polygonLayers) {
         const layer = polygonLayers[code];
+        if (!map.hasLayer(layer)) continue;
+        layer.eachLayer(l => {
+          if (l.feature && b.contains(l.getBounds().getCenter()) && !basket.has(l.feature.properties.cadnum)) {
+            basket.add(l.feature.properties.cadnum); added++;
+          }
+        });
+      }
+      for (const ot in ownRegionLayers) {           // режим «Вся карта» — региональные слои собственности
+        const layer = ownRegionLayers[ot];
         if (!map.hasLayer(layer)) continue;
         layer.eachLayer(l => {
           if (l.feature && b.contains(l.getBounds().getCenter()) && !basket.has(l.feature.properties.cadnum)) {
