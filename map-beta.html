@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>Бета-карта (MapLibre) — кадастр Херсонской области</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
+<style>
+  html,body{margin:0;height:100%;background:#0f1117;font-family:system-ui,sans-serif}
+  #map{position:absolute;inset:0}
+  #hud{position:absolute;top:10px;left:10px;z-index:5;background:rgba(15,17,23,.88);border:1px solid #2a2f42;border-radius:8px;padding:9px 11px;color:#d8dce8;font-size:12px;line-height:1.5;max-width:250px}
+  #hud b{color:#e8c547}
+  #hud a{color:#e8c547;text-decoration:none}
+  #hud a:hover{text-decoration:underline}
+  #hud .leg{display:flex;align-items:center;gap:6px;margin-top:3px}
+  #hud .sw{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+  #hud .back{display:inline-block;margin-bottom:7px;padding:3px 8px;border:1px solid #2a2f42;border-radius:5px}
+  .maplibregl-popup-content{background:#181c27;color:#e8e8ea;border:1px solid #2a2f42;font-size:12px}
+  .maplibregl-popup-tip{border-top-color:#181c27!important;border-bottom-color:#181c27!important}
+  #zoomctl{position:absolute;right:10px;bottom:28px;z-index:5;display:flex;flex-direction:column;gap:2px}
+  #zoomctl button{width:34px;height:34px;background:rgba(15,17,23,.9);border:1px solid #2a2f42;color:#e8e8ea;font-size:20px;line-height:1;cursor:pointer;border-radius:6px}
+  #zoomctl button:hover{border-color:#e8c547;color:#e8c547}
+  #zoomctl button:active{transform:scale(.94)}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="hud">
+  <a class="back" href="index.html">← Основная карта</a>
+  <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
+  <div>Все ~530к участков, плавно на любом зуме. Клик по участку — форма собственности.</div>
+  <div class="leg"><span class="sw" style="background:#4caf7d"></span>Частная</div>
+  <div class="leg"><span class="sw" style="background:#e8c547"></span>Коммунальная</div>
+  <div class="leg"><span class="sw" style="background:#4a9eff"></span>Государственная</div>
+  <div class="leg"><span class="sw" style="background:#e05252"></span>Не определено</div>
+</div>
+<div id="zoomctl"><button id="zin" aria-label="Приблизить">+</button><button id="zout" aria-label="Отдалить">−</button></div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const OWN = { p:['Частная','#4caf7d'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e05252'] };
+const map = new maplibregl.Map({
+  container: 'map',
+  attributionControl: { compact: true },
+  center: [33.45, 46.72], zoom: 9, maxZoom: 19,
+  fadeDuration: 0,
+  style: {
+    version: 8,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources: {
+      base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'], tileSize:256, attribution:'© OpenStreetMap, © CARTO' },
+      parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:8, maxzoom:14 }
+    },
+    layers: [
+      { id:'base', type:'raster', source:'base' },
+      { id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
+        paint:{ 'fill-color':['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e05252','#888888'], 'fill-opacity':0.55, 'fill-antialias':false } },
+      { id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
+        paint:{ 'line-color':'#11141d', 'line-width':0.4 } }
+    ]
+  }
+});
+
+const zc = document.getElementById('zoomctl');
+const zoomStep = d => map.easeTo({ zoom: Math.round(map.getZoom()) + d, duration: 0 });
+document.getElementById('zin').onclick  = () => zoomStep(+1);
+document.getElementById('zout').onclick = () => zoomStep(-1);
+
+map.on('click', 'parcels-fill', e => {
+  const f = e.features[0]; const o = OWN[f.properties.o] || ['—','#888'];
+  new maplibregl.Popup({ closeButton:true })
+    .setLngLat(e.lngLat)
+    .setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b></div>')
+    .addTo(map);
+});
+map.on('mouseenter','parcels-fill',()=>map.getCanvas().style.cursor='pointer');
+map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
+</script>
+</body>
+</html>
