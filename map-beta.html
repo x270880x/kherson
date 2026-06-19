@@ -39,6 +39,10 @@
   #basket button:hover{border-color:#e8c547;color:#e8c547}
   #hud select,#hud input[list]{width:100%;box-sizing:border-box;margin-top:3px;background:#1f2433;color:#e8e8ea;border:1px solid #2a2f42;border-radius:5px;font-size:11px;padding:4px}
   #fine-hint{position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:5;display:none;background:rgba(15,17,23,.92);border:1px solid #2a2f42;border-radius:6px;color:#e8c547;font-size:12px;padding:6px 12px;white-space:nowrap}
+  #hud .bt{background:#1f2433;color:#8b91a8;border:1px solid #2a2f42;font-size:11px;padding:3px 10px;cursor:pointer}
+  #hud .bt:first-child{border-radius:5px 0 0 5px}
+  #hud .bt:last-child{border-radius:0 5px 5px 0;border-left:none}
+  #hud .bt.on{background:#e8c547;color:#1a1a1a;border-color:#e8c547}
 </style>
 </head>
 <body>
@@ -47,6 +51,7 @@
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
   <div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:2px 0 3px">529 725 уч · 1 912 549 га · 337 сёл · 20 р-нов · 2 412 разм.</div>
+  <div style="margin:4px 0"><button id="b-scheme" class="bt on">Схема</button><button id="b-sat" class="bt">Спутник</button></div>
   <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
@@ -73,19 +78,21 @@
 const OWN = { p:['Частная','#4caf7d'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e05252'] };
 const map = new maplibregl.Map({
   container: 'map',
-  attributionControl: { compact: true },
+  attributionControl: false,
   center: [33.45, 46.72], zoom: 9, maxZoom: 19,
   fadeDuration: 0,
   style: {
     version: 8,
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
-      base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256, attribution:'© OpenStreetMap, © CARTO' },
+      base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
+      sat: { type:'raster', tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize:256, maxzoom:19 },
       omt: { type:'vector', url:'https://tiles.openfreemap.org/planet', attribution:'© OpenMapTiles' },
       parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:8, maxzoom:14 }
     },
     layers: [
       { id:'base', type:'raster', source:'base' },
+      { id:'sat', type:'raster', source:'sat', layout:{visibility:'none'} },
       { id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
         paint:{ 'fill-color':['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e05252','#888888'], 'fill-opacity':0.55, 'fill-antialias':false } },
       { id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
@@ -105,6 +112,17 @@ const zc = document.getElementById('zoomctl');
 const zoomStep = d => map.easeTo({ zoom: Math.round(map.getZoom()) + d, duration: 0 });
 document.getElementById('zin').onclick  = () => zoomStep(+1);
 document.getElementById('zout').onclick = () => zoomStep(-1);
+
+// Переключатель подложки: схема (тёмная) / спутник (Esri)
+function setBase(sat){
+  if(!map.getLayer('sat')) return;
+  map.setLayoutProperty('base','visibility', sat?'none':'visible');
+  map.setLayoutProperty('sat','visibility', sat?'visible':'none');
+  document.getElementById('b-scheme').classList.toggle('on', !sat);
+  document.getElementById('b-sat').classList.toggle('on', sat);
+}
+document.getElementById('b-scheme').onclick = () => setBase(false);
+document.getElementById('b-sat').onclick = () => setBase(true);
 
 // ── Полный попап участка: индекс советов + point-in-polygon по оригиналам + ленивая подгрузка ──
 const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
