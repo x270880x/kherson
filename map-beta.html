@@ -123,7 +123,7 @@ const TITLE_AWAY_ZOOM = 8.6;                 // zoom: ≤ — титул по ц
 const regionTitleEl = document.createElement('div');
 regionTitleEl.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;pointer-events:none';
 regionTitleEl.innerHTML =
-  '<div class="rt-inner" style="display:flex;align-items:center;gap:12px;white-space:nowrap;will-change:transform,opacity;transition:transform .8s cubic-bezier(.4,0,.2,1), opacity .7s ease">' +
+  '<div class="rt-inner" style="display:flex;align-items:center;gap:12px;white-space:nowrap;will-change:transform,opacity">' +
     '<img src="gerb.svg" alt="" style="height:57px;width:auto;flex-shrink:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))">' +
     '<span class="rt-text" style="font:800 39px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
   '</div>';
@@ -133,7 +133,11 @@ document.getElementById('map').appendChild(regionTitleEl);
 function updateRegionTitle(isLight){
   if (isLight === undefined) isLight = document.querySelector('#hud .bt[data-b="light"]').classList.contains('on');
   const away = map.getZoom() > TITLE_AWAY_ZOOM;   // при приближении — улетает в правый верхний угол и тает
-  regionTitleInner.style.transform = away ? 'translate(44vw,-42vh) scale(.4)' : 'translate(0,0) scale(1)';
+  // улетает: видно почти весь путь, гаснет только у угла (opacity с задержкой); назад — появляется сразу
+  regionTitleInner.style.transition = away
+    ? 'transform .9s cubic-bezier(.45,0,.25,1), opacity .3s ease .55s'
+    : 'transform .55s ease, opacity .35s ease';
+  regionTitleInner.style.transform = away ? 'translate(46vw,-44vh) scale(.4)' : 'translate(0,0) scale(1)';
   regionTitleInner.style.opacity = away ? '0' : '1';
   regionTitleText.style.color = isLight ? '#1a2740' : '#eef1f6';
   regionTitleText.style.textShadow = isLight
@@ -230,12 +234,12 @@ map.on('click','lbl-place', e=>{
         const rc=CIDX.filter(c=>c.c.slice(2,5)===pfx&&c.lat&&c.lon);
         if(rc.length){
           const lo=rc.map(c=>c.lon),la=rc.map(c=>c.lat);
-          map.fitBounds([[Math.min(...lo)-.03,Math.min(...la)-.03],[Math.max(...lo)+.03,Math.max(...la)+.03]],{padding:40,duration:700,essential:true});
+          map.fitBounds([[Math.min(...lo)-.03,Math.min(...la)-.03],[Math.max(...lo)+.03,Math.max(...la)+.03]],{padding:40,duration:1600,essential:true});
           return;
         }
       }
     }
-    map.flyTo({center:e.lngLat,zoom:9,duration:700,essential:true});
+    map.flyTo({center:e.lngLat,zoom:9,duration:1600,essential:true});
     return;
   }
 
