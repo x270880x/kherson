@@ -1417,7 +1417,7 @@ function renderSidebar() {
         <span style="display:block;color:${ownColor(r)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(ruOwn(r).replace(' собственность',''))}</span>
         <span style="display:block;font-family:'IBM Plex Mono',monospace;color:${ownColor(r)};font-size:9px;word-spacing:-0.3em">${fmtHa(OWN_AREA[r] || 0)}</span>
       </span>
-      <span style="flex-shrink:0;font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px"><span style="word-spacing:-0.55em">${fmt(STATS.ownership_split[r] || 0)}</span> уч.</span>
+      <span style="flex-shrink:0;font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px"><span style="word-spacing:-0.48em">${fmt(STATS.ownership_split[r] || 0)}</span> уч.</span>
     </label>
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
