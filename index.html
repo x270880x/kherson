@@ -1909,7 +1909,7 @@ buildMarkers();
 const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
 map.fitBounds(bounds, { padding: [40, 40] });
 // старт на ~15% ближе: целочисленный фит + log2(1.155)
-map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.155), { animate: false });
+map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.213), { animate: false });
 map.setMinZoom(map.getZoom());   // нельзя зумаут дальше стартового кадра
 </script>
 </body>
