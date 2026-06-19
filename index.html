@@ -1415,7 +1415,7 @@ function renderSidebar() {
       <span style="width:10px;height:10px;border-radius:2px;background:${ownColor(r)};flex-shrink:0"></span>
       <span style="flex:1;min-width:0;line-height:1.25">
         <span style="display:block;color:${ownColor(r)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(ruOwn(r).replace(' собственность',''))}</span>
-        <span style="display:block;font-family:'IBM Plex Mono',monospace;color:${ownColor(r)};font-size:10.5px">${fmtHa(OWN_AREA[r] || 0)}</span>
+        <span style="display:block;font-family:'IBM Plex Mono',monospace;color:${ownColor(r)};font-size:9px;word-spacing:-0.3em">${fmtHa(OWN_AREA[r] || 0)}</span>
       </span>
       <span style="flex-shrink:0;font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px"><span style="word-spacing:-0.55em">${fmt(STATS.ownership_split[r] || 0)}</span> уч.</span>
     </label>
