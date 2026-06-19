@@ -115,19 +115,18 @@ const zoomStep = d => map.easeTo({ zoom: map.getZoom() + d, duration: 320, easin
 document.getElementById('zin').onclick  = () => zoomStep(+0.35);
 document.getElementById('zout').onclick = () => zoomStep(-0.35);
 
-// ── Титул региона: герб + «Херсонская область» поверх карты, плавно исчезает при приближении ──
-const REGION_TITLE_POS = [33.408, 46.542];   // центр области (точка бывшей OMT-подписи class=state)
-const TITLE_FADE = [8.6, 10.0];              // zoom: ≤8.6 — видно полностью, ≥10 — скрыто (≈+2 уровня от обзорного)
+// ── Титул региона: герб + «Херсонская область» — фиксированный оверлей по центру канваса ──
+const TITLE_FADE = [8.6, 10.0];              // zoom: ≤8.6 — видно полностью, ≥10 — скрыто
 const regionTitleEl = document.createElement('div');
-regionTitleEl.style.pointerEvents = 'none';   // корнем маркера управляет MapLibre (его opacity), fade — на внутреннем .rt-inner
+regionTitleEl.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;pointer-events:none';
 regionTitleEl.innerHTML =
-  '<div class="rt-inner" style="display:flex;align-items:center;gap:13px;white-space:nowrap;transition:opacity .25s ease">' +
-    '<img src="gerb.svg" alt="" style="height:29px;width:auto;flex-shrink:0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">' +
-    '<span class="rt-text" style="font:700 19px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
+  '<div class="rt-inner" style="display:flex;align-items:center;gap:4px;white-space:nowrap;transition:opacity .25s ease">' +
+    '<img src="gerb.svg" alt="" style="height:19px;width:auto;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">' +
+    '<span class="rt-text" style="font:700 13px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
   '</div>';
 const regionTitleInner = regionTitleEl.querySelector('.rt-inner');
 const regionTitleText = regionTitleEl.querySelector('.rt-text');
-new maplibregl.Marker({ element: regionTitleEl, anchor: 'center' }).setLngLat(REGION_TITLE_POS).addTo(map);
+document.getElementById('map').appendChild(regionTitleEl);
 function updateRegionTitle(isLight){
   if (isLight === undefined) isLight = document.querySelector('#hud .bt[data-b="light"]').classList.contains('on');
   const z = map.getZoom(), [a,b] = TITLE_FADE;
