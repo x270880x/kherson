@@ -13,7 +13,9 @@
   #hud b{color:#e8c547}
   #hud a{color:#e8c547;text-decoration:none}
   #hud a:hover{text-decoration:underline}
-  #hud .leg{display:flex;align-items:center;gap:6px;margin-top:3px}
+  #hud .leg{display:flex;align-items:center;gap:6px;margin-top:3px;cursor:pointer;user-select:none}
+  #hud .leg input{margin:0;width:13px;height:13px;accent-color:#e8c547;flex-shrink:0}
+  #hud .leg.off{opacity:.4}
   #hud .sw{width:11px;height:11px;border-radius:2px;flex-shrink:0}
   #hud .back{display:inline-block;margin-bottom:7px;padding:3px 8px;border:1px solid #2a2f42;border-radius:5px}
   .maplibregl-popup-content{background:#181c27;color:#e8e8ea;border:1px solid #2a2f42;font-size:12px}
@@ -29,11 +31,11 @@
 <div id="hud">
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
-  <div>Все ~530к участков, плавно на любом зуме. Клик по участку — форма собственности.</div>
-  <div class="leg"><span class="sw" style="background:#4caf7d"></span>Частная</div>
-  <div class="leg"><span class="sw" style="background:#e8c547"></span>Коммунальная</div>
-  <div class="leg"><span class="sw" style="background:#4a9eff"></span>Государственная</div>
-  <div class="leg"><span class="sw" style="background:#e05252"></span>Не определено</div>
+  <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности на всей карте.</div>
+  <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
+  <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
+  <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
+  <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#e05252"></span>Не определено</label>
 </div>
 <div id="zoomctl"><button id="zin" aria-label="Приблизить">+</button><button id="zout" aria-label="Отдалить">−</button></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -75,6 +77,21 @@ map.on('click', 'parcels-fill', e => {
 });
 map.on('mouseenter','parcels-fill',()=>map.getCanvas().style.cursor='pointer');
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
+
+// Переключатели форм собственности — показать/скрыть по ВСЕЙ карте (вкл. частные)
+const ownActive = new Set(['p','k','g','n']);
+function applyOwnFilter(){
+  const f = ['in', ['get','o'], ['literal', [...ownActive]]];
+  if (map.getLayer('parcels-fill')) map.setFilter('parcels-fill', f);
+  if (map.getLayer('parcels-line')) map.setFilter('parcels-line', f);
+}
+document.querySelectorAll('#hud .leg[data-o]').forEach(lab => {
+  lab.querySelector('input').addEventListener('change', e => {
+    if (e.target.checked) ownActive.add(lab.dataset.o); else ownActive.delete(lab.dataset.o);
+    lab.classList.toggle('off', !e.target.checked);
+    applyOwnFilter();
+  });
+});
 </script>
 </body>
 </html>
