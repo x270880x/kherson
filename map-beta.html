@@ -152,6 +152,7 @@ updateRegionTitle();
 function setBaseLabels(isLight){
   const halo=isLight?'#ffffff':'#0f1117';
   if(map.getLayer('lbl-place')){ map.setPaintProperty('lbl-place','text-color', isLight?'#1f2433':'#eef1f6'); map.setPaintProperty('lbl-place','text-halo-color',halo); }
+  if(map.getLayer('lbl-councils')){ map.setPaintProperty('lbl-councils','text-color', isLight?'#1f2433':'#eef1f6'); map.setPaintProperty('lbl-councils','text-halo-color',halo); }   // подписи сельсоветов (пгт/сёла)
   if(map.getLayer('lbl-state')){ map.setPaintProperty('lbl-state','text-color', isLight?'#1f2433':'#eef1f6'); map.setPaintProperty('lbl-state','text-halo-color',halo); }  // соседние области (text-opacity 0.5 задан в стиле)
   if(map.getLayer('lbl-water')){ map.setPaintProperty('lbl-water','text-color', isLight?'#1c4f8a':'#8fb6e0'); map.setPaintProperty('lbl-water','text-halo-color',halo); }
   if(typeof updateRegionTitle==='function') updateRegionTitle(isLight);   // титул региона подстраивает цвет под подложку
@@ -167,7 +168,17 @@ document.querySelectorAll('#hud .bt[data-b]').forEach(b=>b.onclick=()=>setBase(b
 // ── Полный попап участка: индекс советов + point-in-polygon по оригиналам + ленивая подгрузка ──
 const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
 let CIDX = [];
-fetch(BASE + 'councils-index.json').then(r=>r.json()).then(d=>CIDX=d).catch(()=>{});
+fetch(BASE + 'councils-index.json').then(r=>r.json()).then(d=>{ CIDX=d; addCouncilLabels(); }).catch(()=>{});
+// Подписи сельсоветов (пгт/сёла) из наших данных — OMT на обзорном зуме их не отдаёт. Слой добавляется поверх lbl-place → collision: OMT-города в приоритете, наши заполняют пробелы (сёла); прореживание сортирует по числу участков.
+function addCouncilLabels(){
+  if(!CIDX.length || !map.getLayer('lbl-place') || map.getSource('councils')) return;
+  map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:CIDX.filter(c=>c.lat&&c.lon).map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n),total:c.total||0}}))}});
+  map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:8,
+    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['linear'],['zoom'],8,9.5,12,12], 'text-max-width':7, 'symbol-sort-key':['-',['get','total']] },
+    paint:{ 'text-color':'#1f2433', 'text-halo-color':'#ffffff', 'text-halo-width':1.2 } });
+  setBaseLabels(document.querySelector('#hud .bt[data-b="light"]').classList.contains('on'));
+}
+map.on('styledata', addCouncilLabels);   // если CIDX уже загружен — добавит, как только стиль готов
 const cjCache = {}, pfCache = {};
 async function councilParcels(code){ if(!cjCache[code]){ try{ const r=await fetch(BASE+'councils/'+code+'.json'); cjCache[code]=r.ok?((await r.json()).parcels||[]):[]; }catch(e){cjCache[code]=[];} } return cjCache[code]; }
 async function rawFeats(code){ if(!pfCache[code]){ try{ const r=await fetch(BASE+'parcels/'+code+'.geojson'); pfCache[code]=r.ok?((await r.json()).features||[]):[]; }catch(e){pfCache[code]=[];} } return pfCache[code]; }
@@ -193,7 +204,8 @@ function popupHTML(rec, cname){
 let boxDragged=false;
 map.on('click', 'parcels-fill', async e => {
   if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
-  if(map.queryRenderedFeatures(e.point,{layers:['lbl-place']}).length) return;   // клик по названию НП → зум (обработчик lbl-place), не плашка
+  const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]);
+  if(map.queryRenderedFeatures(e.point,{layers:_lbls}).length) return;   // клик по названию НП (OMT или наш совет) → зум, не плашка участка
   const visPlaces=map.queryRenderedFeatures({layers:['lbl-place']}).filter(f=>['city','town','village','hamlet'].includes(f.properties&&f.properties.class));
   if(visPlaces.length>10) return;   // слишком крупный план — участки не кликабельны
   const x=e.lngLat.lng, y=e.lngLat.lat, shift=e.originalEvent && e.originalEvent.shiftKey;
@@ -256,8 +268,27 @@ map.on('click','lbl-place', e=>{
   }
   map.flyTo({center:e.lngLat,zoom:12,duration:700,essential:true});
 });
-map.on('mouseenter','lbl-place',()=>map.getCanvas().style.cursor='pointer');
-map.on('mouseleave','lbl-place',()=>map.getCanvas().style.cursor='');
+// Наведение на НП → табличка форм собственности ближайшего совета (счётчики участков)
+const hoverPop = new maplibregl.Popup({ closeButton:false, closeOnClick:false, offset:12, maxWidth:'none', className:'rt-hover-pop' });
+document.head.insertAdjacentHTML('beforeend','<style>.rt-hover-pop{pointer-events:none}.rt-hover-pop .maplibregl-popup-content{padding:7px 9px}</style>');
+function ownTableHTML(c){
+  const o=c.o||{}, row=k=>'<div style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:9px;height:9px;border-radius:2px;background:'+OWN[k][1]+';flex-shrink:0"></span><span style="flex:1;color:#cfd3df">'+OWN[k][0]+'</span><b style="font-family:ui-monospace,monospace;color:#e8e8ea">'+(o[k]||0).toLocaleString('ru')+'</b></div>';
+  return '<div style="font-size:11px;line-height:1.55;min-width:172px"><div style="color:#e8c547;font-weight:600;margin-bottom:3px">'+esc(ruName(c.n))+'</div>'+row('p')+row('k')+row('g')+row('n')+'<div style="display:flex;justify-content:space-between;border-top:1px solid #2a2f42;margin-top:3px;padding-top:3px"><span style="color:#8b91a8">всего участков</span><b style="font-family:ui-monospace,monospace;color:#e8c547">'+(c.total||0).toLocaleString('ru')+'</b></div></div>';
+}
+function nearestCouncil(lon,lat){ let best=null,bd=1e9; for(const c of CIDX){ const d=(c.lat-lat)**2+(c.lon-lon)**2; if(d<bd){bd=d;best=c;} } return {best,bd}; }
+function showHoverTable(ll){ if(!CIDX.length) return; const {best,bd}=nearestCouncil(ll[0],ll[1]); if(best && best.o && bd<0.04) hoverPop.setLngLat(ll).setHTML(ownTableHTML(best)).addTo(map); }   // в пределах ~22км (свои советы, не соседние области)
+map.on('mouseenter','lbl-place', e=>{ map.getCanvas().style.cursor='pointer'; const f=e.features&&e.features[0]; if(f && ['city','town','village','hamlet'].includes(f.properties.class)) showHoverTable(f.geometry.coordinates); });
+map.on('mouseenter','lbl-councils', e=>{ map.getCanvas().style.cursor='pointer'; const f=e.features&&e.features[0]; if(f) showHoverTable(f.geometry.coordinates); });
+const clearHover=()=>{ map.getCanvas().style.cursor=''; hoverPop.remove(); };
+map.on('mouseleave','lbl-place', clearHover);
+map.on('mouseleave','lbl-councils', clearHover);
+// Клик по подписи совета (наш слой) → приближение к селу + соседним (как у lbl-place city/village)
+map.on('click','lbl-councils', e=>{
+  const lat=e.lngLat.lat, lng=e.lngLat.lng;
+  const near=CIDX.filter(c=>Math.abs(c.lat-lat)<0.12&&Math.abs(c.lon-lng)<0.16&&c.lat&&c.lon);
+  if(near.length){ const lo=near.map(c=>c.lon),la=near.map(c=>c.lat); map.fitBounds([[Math.min(...lo)-.02,Math.min(...la)-.02],[Math.max(...lo)+.02,Math.max(...la)+.02]],{padding:30,maxZoom:13,duration:700,essential:true}); return; }
+  map.flyTo({center:e.lngLat,zoom:12,duration:700,essential:true});
+});
 
 // Переключатели форм собственности — показать/скрыть по ВСЕЙ карте (вкл. частные)
 const ownActive = new Set(['p','k','g','n']);
