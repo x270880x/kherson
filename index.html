@@ -731,11 +731,12 @@ const LABEL_MAX_COUNCILS = 60;          // если в кадре больше �
 let parcelTiles = null;
 const TILE_OWN_COLOR = { p: '#4caf7d', k: '#e8c547', g: '#4a9eff', n: '#e05252' };  // = ownColor
 
+const LABEL_OFFSET = { '6525010100': [0, 11] };   // ручные сдвиги отдельных подписей (px): Олешки/Алёшки — вниз ~3мм
 function fmAddLabel(c) {
   if (fullMapLabelByCode[c.code] || !c.lat) return;
   const rn = ruName(c.name);
   const town = /^(пгт|г\.|м\.|город)/i.test(rn);
-  const tip = L.tooltip({ permanent: true, direction: 'center', className: 'council-label' + (town ? ' town' : ''), interactive: false })
+  const tip = L.tooltip({ permanent: true, direction: 'center', offset: LABEL_OFFSET[c.code] || [0, 0], className: 'council-label' + (town ? ' town' : ''), interactive: false })
     .setLatLng([c.lat, c.lon]).setContent(escapeHtml(rn));
   tip.addTo(map);
   fullMapLabelByCode[c.code] = tip;
