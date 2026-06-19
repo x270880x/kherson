@@ -46,6 +46,7 @@
 <div id="hud">
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
+  <div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:2px 0 3px">529 725 уч · 1 912 549 га · 337 сёл · 20 р-нов · 2 412 разм.</div>
   <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
@@ -186,10 +187,17 @@ qEl.addEventListener('input', ()=>{
   const v=qEl.value.trim(); if(!v){ qres.innerHTML=''; return; }
   if(CAD_RE.test(v)){ qres.innerHTML='<div class="qrow muted">↵ Enter — найти участок</div>'; return; }
   const low=v.toLowerCase();
-  const hits=CIDX.map((c,i)=>({c,i})).filter(o=>ruName(o.c.n).toLowerCase().includes(low)||(o.c.n||'').toLowerCase().includes(low)).slice(0,8);
-  qres.innerHTML = hits.length ? hits.map(o=>'<div class="qrow" data-i="'+o.i+'">'+esc(ruName(o.c.n))+'</div>').join('') : '<div class="qrow muted">ничего не найдено</div>';
+  const settle=CIDX.map((c,i)=>({c,i})).filter(o=>ruName(o.c.n).toLowerCase().includes(low)||(o.c.n||'').toLowerCase().includes(low)).slice(0,6);
+  const rent=RENTERS.filter(r=>r.toLowerCase().includes(low)).slice(0,5);
+  let html=settle.map(o=>'<div class="qrow" data-i="'+o.i+'">'+esc(ruName(o.c.n))+'</div>').join('');
+  html+=rent.map(r=>'<div class="qrow" data-r="'+esc(r)+'"><span style="color:#8b91a8;font-size:10px">аренд.</span> '+esc(r)+'</div>').join('');
+  qres.innerHTML = html || '<div class="qrow muted">ничего не найдено</div>';
 });
-qres.addEventListener('click', e=>{ const r=e.target.closest('.qrow[data-i]'); if(r){ const c=CIDX[+r.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; } });
+qres.addEventListener('click', e=>{
+  const row=e.target.closest('.qrow'); if(!row) return;
+  if(row.dataset.i!==undefined){ const c=CIDX[+row.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; }
+  else if(row.dataset.r){ const inp=document.getElementById('f-r'); inp.value=row.dataset.r; inp.dispatchEvent(new Event('change',{bubbles:true})); qEl.value=''; qres.innerHTML=''; }
+});
 qEl.addEventListener('keydown', e=>{ if(e.key!=='Enter') return; const m=qEl.value.match(CAD_RE); if(m){ flyCad(m[0]); return; } const first=qres.querySelector('.qrow[data-i]'); if(first){ const c=CIDX[+first.dataset.i]; flyCouncil(c); qEl.value=ruName(c.n); qres.innerHTML=''; } });
 
 // ── Подборка участков ──
@@ -247,7 +255,7 @@ document.getElementById('bk-exp').onclick=()=>{
 // ── Тонкие фильтры (гибрид): при приближении грузим данные совета и показываем только подходящие ──
 const OTC2={'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n'};
 const fine={ mz:'', ct:'', ly:'', r:'' };  // межевание | категория | год аренды | арендатор
-let RENTC={};
+let RENTC={}, RENTERS=[];
 function hasFine(){ return !!(fine.mz||fine.ct||fine.ly||fine.r); }
 function matchLease(rec){ const y=rec.ey; if(fine.ly==='none') return !y; if(fine.ly==='expired') return y&&y<2026; if(fine.ly==='2030+') return y&&y>=2030; return y&&String(y)===fine.ly; }
 const FINE_MINZOOM=13;
@@ -293,7 +301,7 @@ fetch(BASE+'filters-beta.json').then(r=>r.json()).then(F=>{
   (F.lease_years||[]).slice().sort((a,b)=>b-a).forEach(y=>{ const o=document.createElement('option'); o.value=String(y); o.textContent='до '+y; ly.appendChild(o); });
   const dl=document.getElementById('renters-dl');
   (F.renters||[]).forEach(r=>{ const o=document.createElement('option'); o.value=r; dl.appendChild(o); });
-  RENTC=F.renter_councils||{};
+  RENTC=F.renter_councils||{}; RENTERS=F.renters||[];
 }).catch(()=>{});
 document.getElementById('f-r').addEventListener('change', e=>{
   fine.r=e.target.value.trim();
