@@ -82,6 +82,7 @@ const map = new maplibregl.Map({
   container: 'map',
   attributionControl: false,
   bounds: KHERSON_BOUNDS, fitBoundsOptions: { padding: 12 },
+  minZoom: 8,            // тайлсет участков начинается с z8 — стартовый кадр НЕ должен опускаться ниже, иначе MapLibre не запрашивает тайлы и полигоны пропадают
   maxZoom: 19,
   fadeDuration: 0,
   style: {
