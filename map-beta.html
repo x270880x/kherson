@@ -87,7 +87,7 @@ const map = new maplibregl.Map({
   fadeDuration: 0,
   style: {
     version: 8,
-    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    glyphs: location.origin + location.pathname.replace(/[^/]*$/, '') + 'fonts/{fontstack}/{range}.pbf',   // self-hosted (был openfreemap — блокировался/не грузился на части сетей → подписи пропадали)
     sources: {
       light: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
       base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
