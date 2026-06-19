@@ -187,6 +187,8 @@ let boxDragged=false;
 map.on('click', 'parcels-fill', async e => {
   if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
   if(map.queryRenderedFeatures(e.point,{layers:['lbl-place']}).length) return;   // клик по названию НП → зум (обработчик lbl-place), не плашка
+  const visPlaces=map.queryRenderedFeatures({layers:['lbl-place']}).filter(f=>['city','town','village','hamlet'].includes(f.properties&&f.properties.class));
+  if(visPlaces.length>10) return;   // слишком крупный план — участки не кликабельны
   const x=e.lngLat.lng, y=e.lngLat.lat, shift=e.originalEvent && e.originalEvent.shiftKey;
   const popup = shift ? null : new maplibregl.Popup({maxWidth:'320px'}).setLngLat(e.lngLat).setHTML('<span style="font-size:12px;color:#8b91a8">загрузка…</span>').addTo(map);
   const near=CIDX.filter(c=>Math.abs(c.lat-y)<0.25&&Math.abs(c.lon-x)<0.3).sort((a,b)=>((a.lat-y)**2+(a.lon-x)**2)-((b.lat-y)**2+(b.lon-x)**2)).slice(0,4);
