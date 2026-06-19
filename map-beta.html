@@ -172,7 +172,7 @@ document.querySelectorAll('#hud .bt[data-b]').forEach(b=>b.onclick=()=>setBase(b
 // ── Полный попап участка: индекс советов + point-in-polygon по оригиналам + ленивая подгрузка ──
 const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
 let CIDX = [];
-fetch(BASE + 'councils-index.json').then(r=>r.json()).then(d=>{ CIDX=d; addCouncilLabels(); }).catch(()=>{});
+fetch(BASE + 'councils-index.json').then(r=>r.json()).then(d=>{ CIDX=d; addCouncilLabels(); }).catch(e=>console.warn('councils-index.json не загрузился — наших подписей (центры/сёла) не будет',e));
 // Выпуклая оболочка точек (Эндрю) — для приглушения подписей вне Херсонщины
 function convexHull(pts){
   const p=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]); if(p.length<3) return p.concat([p[0]]);
@@ -202,8 +202,8 @@ function addCouncilLabels(){
     layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['linear'],['zoom'],8,9.5,12,12], 'text-max-width':7, 'symbol-sort-key':['-',['get','total']] },
     paint:{ 'text-color':'#1f2433', 'text-halo-color':'#ffffff', 'text-halo-width':1.2 } });
   // (2) ГЛАВНЫЕ сёла/города районов — БОЛД и ×1.5; вставлен ПЕРЕД lbl-place → приоритет коллизии (OMT-дубль уступает)
-  map.addLayer({ id:'lbl-centers', type:'symbol', source:'councils', minzoom:8, filter:['any',['get','ctr'],['get','big']],
-    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Bold'], 'text-size':['interpolate',['linear'],['zoom'],8,['case',['get','capital'],21.38,14.25],12,['case',['get','capital'],27,18]], 'text-letter-spacing':0.06, 'text-max-width':8, 'symbol-sort-key':['-',['get','total']], 'text-allow-overlap':true },
+  map.addLayer({ id:'lbl-centers', type:'symbol', source:'councils', minzoom:7, filter:['any',['get','ctr'],['get','big']],
+    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Bold'], 'text-size':['interpolate',['linear'],['zoom'],8,['case',['==',['get','capital'],true],21.38,14.25],12,['case',['==',['get','capital'],true],27,18]], 'text-letter-spacing':0.06, 'text-max-width':8, 'symbol-sort-key':['-',['get','total']], 'text-allow-overlap':true },
     paint:{ 'text-color':'#10182b', 'text-halo-color':'#ffffff', 'text-halo-width':1.7 } }, 'lbl-place');
   // (1) Приглушить OMT-подписи ВНЕ Херсонской области: оболочка советов → within (внутри opacity 1, снаружи 0.4)
   const hull={type:'Polygon',coordinates:[convexHull(pts.map(c=>[c.lon,c.lat]))]};
