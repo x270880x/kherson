@@ -130,15 +130,16 @@ regionTitleEl.innerHTML =
 const regionTitleInner = regionTitleEl.querySelector('.rt-inner');
 const regionTitleText = regionTitleEl.querySelector('.rt-text');
 document.getElementById('map').appendChild(regionTitleEl);
+// Полёт в правый верхний угол — через @keyframes: видно почти весь путь, тает только у угла; возврат в центр — transition
+document.head.insertAdjacentHTML('beforeend', '<style>' +
+  '.rt-inner{transition:transform .5s cubic-bezier(.2,.7,.3,1), opacity .4s ease}' +
+  '.rt-inner.rt-away{animation:rt-fly .95s cubic-bezier(.4,0,.2,1) forwards}' +
+  '@keyframes rt-fly{0%{transform:translate(0,0) scale(1);opacity:1}60%{opacity:1}100%{transform:translate(46vw,-44vh) scale(.4);opacity:0}}' +
+'</style>');
 function updateRegionTitle(isLight){
   if (isLight === undefined) isLight = document.querySelector('#hud .bt[data-b="light"]').classList.contains('on');
   const away = map.getZoom() > TITLE_AWAY_ZOOM;   // при приближении — улетает в правый верхний угол и тает
-  // улетает: видно почти весь путь, гаснет только у угла (opacity с задержкой); назад — появляется сразу
-  regionTitleInner.style.transition = away
-    ? 'transform .9s cubic-bezier(.45,0,.25,1), opacity .3s ease .55s'
-    : 'transform .55s ease, opacity .35s ease';
-  regionTitleInner.style.transform = away ? 'translate(46vw,-44vh) scale(.4)' : 'translate(0,0) scale(1)';
-  regionTitleInner.style.opacity = away ? '0' : '1';
+  regionTitleInner.classList.toggle('rt-away', away);   // полёт через @keyframes (надёжнее transition при частых zoom-событиях)
   regionTitleText.style.color = isLight ? '#1a2740' : '#eef1f6';
   regionTitleText.style.textShadow = isLight
     ? '0 1px 4px rgba(255,255,255,.95), 0 0 12px rgba(255,255,255,.8)'
