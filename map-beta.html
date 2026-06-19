@@ -108,9 +108,9 @@ const map = new maplibregl.Map({
 });
 
 const zc = document.getElementById('zoomctl');
-const zoomStep = d => map.easeTo({ zoom: Math.round(map.getZoom()) + d, duration: 0 });
-document.getElementById('zin').onclick  = () => zoomStep(+1);
-document.getElementById('zout').onclick = () => zoomStep(-1);
+const zoomStep = d => map.easeTo({ zoom: map.getZoom() + d, duration: 220, easing: t => t*(2-t) });
+document.getElementById('zin').onclick  = () => zoomStep(+0.5);
+document.getElementById('zout').onclick = () => zoomStep(-0.5);
 
 // Переключатель подложки: светлая (voyager) / тёмная (CARTO dark) / спутник (Esri)
 function setBaseLabels(isLight){
@@ -250,7 +250,7 @@ const EMPTY={type:'FeatureCollection',features:[]};
 let parcelsAdded=false;
 function addParcels(){
   if(parcelsAdded || !map.getSource('parcels')) return; parcelsAdded=true;
-  const before = map.getLayer('fine-fill') ? 'fine-fill' : undefined;
+  const before = map.getLayer('lbl-water') ? 'lbl-water' : undefined;   // под подписями; fine/basket добавятся выше
   map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
     paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':0.55, 'fill-antialias':false } }, before);
   map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
@@ -258,6 +258,7 @@ function addParcels(){
   applyOwnFilter();
 }
 map.on('load', ()=>{
+  addParcels();   // детерминированно: участки добавляются сразу после первого кадра подложки (без зависимости от idle/таймеров)
   // оверлей отфильтрованных участков (гибрид: подгрузка по зуму)
   map.addSource('fine',{type:'geojson',data:EMPTY});
   map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.62,'fill-antialias':false}},'lbl-water');
@@ -267,8 +268,6 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
-  map.once('idle', addParcels);   // подложка отрисована → подгружаем участки
-  setTimeout(addParcels, 2000);   // подстраховка, если idle задержится
 });
 
 // Рамка-выделение: Shift+перетаскивание
