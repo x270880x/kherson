@@ -471,7 +471,7 @@ function detailTitle(c) {
 })();
 
 // Init map
-const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
+const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0, zoomDelta: 0.5 }).setView([46.88, 34.40], 10);
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
