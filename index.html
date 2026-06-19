@@ -1413,11 +1413,11 @@ function renderSidebar() {
     <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;line-height:1.3;font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;margin:0">
       <input type="checkbox" value="${escapeHtml(r)}" data-ownership style="margin:0;flex-shrink:0;width:13px;height:13px;accent-color:${ownColor(r)}"/>
       <span style="width:10px;height:10px;border-radius:2px;background:${ownColor(r)};flex-shrink:0"></span>
-      <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${ownColor(r)}">${escapeHtml(ruOwn(r).replace(' собственность',''))}</span>
-      <span style="flex-shrink:0;text-align:right;line-height:1.15">
-        <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px">${fmt(STATS.ownership_split[r] || 0)}</span>
-        <span style="display:block;font-family:'IBM Plex Mono',monospace;color:var(--accent);font-size:10px">${fmtHa(OWN_AREA[r] || 0)}</span>
+      <span style="flex:1;min-width:0;line-height:1.25">
+        <span style="display:block;color:${ownColor(r)};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(ruOwn(r).replace(' собственность',''))}</span>
+        <span style="display:block;font-family:'IBM Plex Mono',monospace;color:${ownColor(r)};font-size:10.5px">${fmtHa(OWN_AREA[r] || 0)}</span>
       </span>
+      <span style="flex-shrink:0;font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px"><span style="word-spacing:-0.34em">${fmt(STATS.ownership_split[r] || 0)}</span> уч.</span>
     </label>
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
