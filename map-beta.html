@@ -76,12 +76,41 @@ const zoomStep = d => map.easeTo({ zoom: Math.round(map.getZoom()) + d, duration
 document.getElementById('zin').onclick  = () => zoomStep(+1);
 document.getElementById('zout').onclick = () => zoomStep(-1);
 
-map.on('click', 'parcels-fill', e => {
-  const f = e.features[0]; const o = OWN[f.properties.o] || ['—','#888'];
-  new maplibregl.Popup({ closeButton:true })
-    .setLngLat(e.lngLat)
-    .setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b></div>')
-    .addTo(map);
+// ── Полный попап участка: индекс советов + point-in-polygon по оригиналам + ленивая подгрузка ──
+const BASE = location.origin + location.pathname.replace(/[^/]*$/, '');
+let CIDX = [];
+fetch(BASE + 'councils-index.json').then(r=>r.json()).then(d=>CIDX=d).catch(()=>{});
+const cjCache = {}, pfCache = {};
+async function councilParcels(code){ if(!cjCache[code]){ try{ const r=await fetch(BASE+'councils/'+code+'.json'); cjCache[code]=r.ok?((await r.json()).parcels||[]):[]; }catch(e){cjCache[code]=[];} } return cjCache[code]; }
+async function rawFeats(code){ if(!pfCache[code]){ try{ const r=await fetch(BASE+'parcels/'+code+'.geojson'); pfCache[code]=r.ok?((await r.json()).features||[]):[]; }catch(e){pfCache[code]=[];} } return pfCache[code]; }
+const PRE={'смт':'пгт','пгт':'пгт','м.':'г.','с.':'с.','х.':'х.'};
+function ruName(name){ const m=(name||'').match(/^(.*?)\s*\(([^)]+)\)\s*$/); if(!m) return name||''; const ua=m[1].trim(); const pm=ua.match(/^(смт|пгт|с\.|х\.|м\.)\s+/i); const pre=pm?((PRE[pm[1].toLowerCase()]||pm[1])+' '):''; return pre+m[2].trim(); }
+function ptInRing(x,y,r){ let inside=false; for(let i=0,j=r.length-1;i<r.length;j=i++){ const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1]; if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+function geomHas(g,x,y){ const f=rr=>ptInRing(x,y,rr[0])&&!rr.slice(1).some(h=>ptInRing(x,y,h)); if(g.type==='Polygon')return f(g.coordinates); if(g.type==='MultiPolygon')return g.coordinates.some(f); return false; }
+const OTC={'Приватна власність':['Частная','#4caf7d'],'Комунальна власність':['Коммунальная','#e8c547'],'Державна власність':['Государственная','#4a9eff'],'Не визначено':['Не определено','#e05252']};
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function popupHTML(rec, cname){
+  const ot=OTC[rec.ot]||['—','#888']; let h='<div style="font-size:12px;line-height:1.5;max-width:300px;color:#e8e8ea">';
+  h+='<div style="font-family:ui-monospace,monospace;color:#e8c547;font-weight:600;word-break:break-all">'+esc(rec.c)+'</div>';
+  h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px">'+(rec.a!=null?rec.a+' га':'')+(cname?' · '+esc(cname):'')+'</div>';
+  if(rec.r) h+='<div><span style="color:#8b91a8">аренд.:</span> '+esc(rec.r)+'</div>';
+  if(rec.o) h+='<div><span style="color:#8b91a8">собств.:</span> '+esc(rec.o)+'</div>';
+  if(rec.ed) h+='<div><span style="color:#8b91a8">договор до:</span> '+esc(rec.ed)+(rec.cn?' · №'+esc(rec.cn):'')+'</div>';
+  h+='<div style="color:'+ot[1]+';font-size:10px;margin-top:4px">'+ot[0]+'</div>';
+  if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</div></div>';
+  return h+'</div>';
+}
+map.on('click', 'parcels-fill', async e => {
+  const x=e.lngLat.lng, y=e.lngLat.lat;
+  const popup=new maplibregl.Popup({maxWidth:'320px'}).setLngLat(e.lngLat).setHTML('<span style="font-size:12px;color:#8b91a8">загрузка…</span>').addTo(map);
+  const near=CIDX.filter(c=>Math.abs(c.lat-y)<0.25&&Math.abs(c.lon-x)<0.3).sort((a,b)=>((a.lat-y)**2+(a.lon-x)**2)-((b.lat-y)**2+(b.lon-x)**2)).slice(0,4);
+  for(const c of near){
+    const feats=await rawFeats(c.c);
+    const hit=feats.find(f=>f.geometry&&geomHas(f.geometry,x,y));
+    if(hit){ const cad=hit.properties.cadnum; const rec=(await councilParcels(c.c)).find(p=>p.c===cad)||{c:cad}; popup.setHTML(popupHTML(rec, ruName(c.n))); return; }
+  }
+  const o=OWN[e.features[0].properties.o]||['—','#888'];
+  popup.setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b><div style="color:#8b91a8;font-size:10px;margin-top:2px">точный участок не найден</div></div>');
 });
 map.on('mouseenter','parcels-fill',()=>map.getCanvas().style.cursor='pointer');
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
