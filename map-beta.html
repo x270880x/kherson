@@ -103,7 +103,7 @@ const map = new maplibregl.Map({
         layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name']], 'text-font':['Noto Sans Italic'], 'text-size':['interpolate',['linear'],['zoom'],6,10,12,15], 'text-max-width':8 },
         paint:{ 'text-color':'#8fb6e0', 'text-halo-color':'#0f1117', 'text-halo-width':1.1 } },
       { id:'lbl-place', type:'symbol', source:'omt', 'source-layer':'place',
-        filter:['in',['get','class'],['literal',['city','town','village','state']]],
+        filter:['in',['get','class'],['literal',['city','town','village']]],   // state (Херсонская область) — заменён кастомным титулом с гербом
         layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name:latin'],['get','name']], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['exponential',1.2],['zoom'],6,11,11,15], 'text-max-width':8 },
         paint:{ 'text-color':'#eef1f6', 'text-halo-color':'#0f1117', 'text-halo-width':1.4 } }
     ]
@@ -115,11 +115,39 @@ const zoomStep = d => map.easeTo({ zoom: map.getZoom() + d, duration: 320, easin
 document.getElementById('zin').onclick  = () => zoomStep(+0.35);
 document.getElementById('zout').onclick = () => zoomStep(-0.35);
 
+// ── Титул региона: герб + «Херсонская область» поверх карты, плавно исчезает при приближении ──
+const REGION_TITLE_POS = [33.408, 46.542];   // центр области (точка бывшей OMT-подписи class=state)
+const TITLE_FADE = [8.6, 10.0];              // zoom: ≤8.6 — видно полностью, ≥10 — скрыто (≈+2 уровня от обзорного)
+const regionTitleEl = document.createElement('div');
+regionTitleEl.style.pointerEvents = 'none';   // корнем маркера управляет MapLibre (его opacity), fade — на внутреннем .rt-inner
+regionTitleEl.innerHTML =
+  '<div class="rt-inner" style="display:flex;align-items:center;gap:13px;white-space:nowrap;transition:opacity .25s ease">' +
+    '<img src="gerb.svg" alt="" style="height:58px;width:auto;flex-shrink:0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">' +
+    '<span class="rt-text" style="font:700 38px/1 system-ui,sans-serif;letter-spacing:.3px">Херсонская область</span>' +
+  '</div>';
+const regionTitleInner = regionTitleEl.querySelector('.rt-inner');
+const regionTitleText = regionTitleEl.querySelector('.rt-text');
+new maplibregl.Marker({ element: regionTitleEl, anchor: 'center' }).setLngLat(REGION_TITLE_POS).addTo(map);
+function updateRegionTitle(isLight){
+  if (isLight === undefined) isLight = document.querySelector('#hud .bt[data-b="light"]').classList.contains('on');
+  const z = map.getZoom(), [a,b] = TITLE_FADE;
+  const op = z <= a ? 1 : z >= b ? 0 : 1 - (z - a) / (b - a);
+  regionTitleInner.style.opacity = op;
+  regionTitleInner.style.visibility = op < 0.02 ? 'hidden' : 'visible';
+  regionTitleText.style.color = isLight ? '#1a2740' : '#eef1f6';
+  regionTitleText.style.textShadow = isLight
+    ? '0 1px 4px rgba(255,255,255,.95), 0 0 12px rgba(255,255,255,.8)'
+    : '0 1px 4px rgba(0,0,0,.9), 0 0 12px rgba(0,0,0,.7)';
+}
+map.on('zoom', updateRegionTitle);
+updateRegionTitle();
+
 // Переключатель подложки: светлая (voyager) / тёмная (CARTO dark) / спутник (Esri)
 function setBaseLabels(isLight){
   const halo=isLight?'#ffffff':'#0f1117';
   if(map.getLayer('lbl-place')){ map.setPaintProperty('lbl-place','text-color', isLight?'#1f2433':'#eef1f6'); map.setPaintProperty('lbl-place','text-halo-color',halo); }
   if(map.getLayer('lbl-water')){ map.setPaintProperty('lbl-water','text-color', isLight?'#1c4f8a':'#8fb6e0'); map.setPaintProperty('lbl-water','text-halo-color',halo); }
+  if(typeof updateRegionTitle==='function') updateRegionTitle(isLight);   // титул региона подстраивает цвет под подложку
 }
 function setBase(which){
   ['light','base','sat'].forEach(l=>{ if(map.getLayer(l)) map.setLayoutProperty(l,'visibility',
