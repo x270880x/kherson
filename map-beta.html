@@ -51,7 +51,7 @@
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
   <div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:2px 0 3px">554 130 уч · 1 975 487 га · 336 сёл · 20 р-нов · 2 412 разм.</div>
-  <div style="margin:4px 0"><button class="bt on" data-b="light">Светлая</button><button class="bt" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
+  <div style="margin:4px 0"><button class="bt" data-b="light">Светлая</button><button class="bt on" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
   <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
@@ -96,8 +96,8 @@ const map = new maplibregl.Map({
       parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:6, maxzoom:14 }
     },
     layers: [
-      { id:'light', type:'raster', source:'light' },
-      { id:'base', type:'raster', source:'base', layout:{visibility:'none'} },
+      { id:'light', type:'raster', source:'light', layout:{visibility:'none'} },
+      { id:'base', type:'raster', source:'base' },   // тёмная подложка — по умолчанию
       { id:'sat', type:'raster', source:'sat', layout:{visibility:'none'} },
       // parcels-fill / parcels-line добавляются отложенно (addParcels) — сначала рисуется подложка
       { id:'lbl-water', type:'symbol', source:'omt', 'source-layer':'water_name',
@@ -497,7 +497,7 @@ map.on('load', ()=>{
   map.addSource('basket',{type:'geojson',data:EMPTY});
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
-  setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
+  setBaseLabels(false);   // по умолчанию ТЁМНАЯ подложка → светлые подписи
   map.fitBounds(KHERSON_BOUNDS, { padding: 76, duration: 0 });   // ~2 см отступа: вся область в кадре с полями (после раскладки контейнера)
   // фиксируем стартовый зум как минимальный → зум-аут (колесо/жест/кнопка) заблокирован ниже стартового вида
   const lockStart = ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); applyPanLock(); };
