@@ -462,9 +462,13 @@ function addParcels(){
   if(parcelsAdded || !map.getSource('parcels') || !map.getLayer('lbl-water')) return;   // ждём, пока стиль готов (есть базовый слой)
   const before = 'lbl-water';   // под подписями; fine/basket добавятся выше
   map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
-    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':0.55, 'fill-antialias':false } }, before);
-  map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:14,
-    paint:{ 'line-color':'#11141d', 'line-width':0.4 } }, before);
+    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':0.45, 'fill-antialias':false } }, before);
+  // Обводка КАЖДОГО участка — чтобы соседние одного цвета не сливались (как на источнике).
+  // Толщина растёт с зумом; видна уже с z12.5 (тонко), к z16+ — чёткая граница.
+  map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:12.5,
+    paint:{ 'line-color':'#0c0f17',
+      'line-width':['interpolate',['linear'],['zoom'], 12.5,0.25, 14,0.6, 16,1.3, 18,2.1, 20,3],
+      'line-opacity':['interpolate',['linear'],['zoom'], 12.5,0.35, 14,0.85, 16,0.95] } }, before);
   parcelsAdded=true;   // флаг только ПОСЛЕ успешного addLayer — иначе повтор на следующем событии стиля
   applyOwnFilter();
 }
@@ -486,8 +490,8 @@ map.on('load', ()=>{
   addRazmezh();   // страховка
   // оверлей отфильтрованных участков (гибрид: подгрузка по зуму)
   map.addSource('fine',{type:'geojson',data:EMPTY});
-  map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.62,'fill-antialias':false}},'lbl-water');
-  map.addLayer({id:'fine-line',type:'line',source:'fine',paint:{'line-color':'#11141d','line-width':0.4}},'lbl-water');
+  map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.55,'fill-antialias':false}},'lbl-water');
+  map.addLayer({id:'fine-line',type:'line',source:'fine',paint:{'line-color':'#0c0f17','line-width':['interpolate',['linear'],['zoom'], 12.5,0.4, 14,0.8, 16,1.5, 18,2.3]}},'lbl-water');
   // подборка — поверх всего
   map.addSource('basket',{type:'geojson',data:EMPTY});
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
