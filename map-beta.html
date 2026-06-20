@@ -199,6 +199,10 @@ function addCouncilLabels(){
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0]}});   //   — волосяной пробел (звезда ближе к слову)
   // Верхній Рогачик (центр Верхнерогачикского р-на) отсутствует в данных — добавляем вручную как центр
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true}});
+  // Велика Олександрівка (центр Великоалександровского р-на) отсутствует в данных — добавляем вручную как центр
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.2786,47.2536]},properties:{name:'Великая Александровка',total:5000,ctr:true}});
+  // Нововоронцовка (центр Нововоронцовского р-на) — в данных только Дудчаны; центр добавляем вручную
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.8703,47.4986]},properties:{name:'Нововоронцовка',total:5000,ctr:true}});
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
   // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
   map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:10, filter:['!',['get','ctr']],
@@ -216,7 +220,7 @@ function addCouncilLabels(){
   map.setPaintProperty('lbl-place','text-opacity',['case',['in',nm,['literal',OUT_OF_REGION]],0.4,['within',hull],1,0.4]);
   // (2) Убрать ДУБЛИ: вырезаем из OMT lbl-place названия, которые рисуем сами (центры/советы) — по name:ru, не по позиции
   const bareRu=n=>{ const m=(n||'').match(/\(([^)]+)\)\s*$/); return m?m[1].trim():(n||''); };
-  const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон','Верхний Рогачик','Верхній Рогачик','Новая Збурьевка','Нова Збурьевка'])];   // + ручной hide чужих OMT-сёл внутри области
+  const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон','Верхний Рогачик','Верхній Рогачик','Новая Збурьевка','Нова Збурьевка','Великая Александровка','Велика Олександрівка','Нововоронцовка','Нововоронцівка'])];   // + ручной hide чужих OMT-сёл внутри области
   map.setFilter('lbl-place',['all',['in',['get','class'],['literal',['city','town']]],['!',['in',nm,['literal',ourNames]]]]);
   setBaseLabels(document.querySelector('#hud .bt[data-b="light"]').classList.contains('on'));
 }
