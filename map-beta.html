@@ -204,8 +204,8 @@ function addCouncilLabels(){
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.2786,47.2536]},properties:{name:'Великая Александровка',total:5000,ctr:true,rpfx:'209'}});
   // Нововоронцовка: район 241 теперь есть в данных (смт + 12 сёл) — центр определяется автоматически, ручной плейсхолдер убран.
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
-  // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
-  map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:8.5, filter:['!',['get','ctr']],
+  // обычные сёла/пгт (НЕ центры) — minzoom 9: на стартовом обзоре (z≈8–8.6) только райцентры (lbl-centers), сёла появляются при приближении
+  map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:9, filter:['!',['get','ctr']],
     layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['linear'],['zoom'],8,11.4,12,14.4], 'text-max-width':7, 'symbol-sort-key':['-',['get','total']] },
     paint:{ 'text-color':'#1f2433', 'text-halo-color':'#ffffff', 'text-halo-width':1.2 } });
   // (2) ГЛАВНЫЕ сёла/города районов — БОЛД и ×1.5; вставлен ПЕРЕД lbl-place → приоритет коллизии (OMT-дубль уступает)
