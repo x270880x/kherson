@@ -240,14 +240,18 @@ const RAION_BY_PREFIX={"101":"город Херсон","104":"Каховский
 const raionOf=code=>RAION_BY_PREFIX[(code||'').slice(2,5)]||'';
 const OTC={'Приватна власність':['Частная собственность','#4caf7d'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#e05252']};
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Копирование кадастрового номера из попапа (как на основной карте)
+function fallbackCopy(text, ok){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); ok(); }catch(e){} document.body.removeChild(ta); }
+function copyCad(btn, text){ const restore=btn.innerHTML; const ok=()=>{ btn.innerHTML='✓'; btn.style.color='#4caf7d'; btn.style.borderColor='#4caf7d'; setTimeout(()=>{ btn.innerHTML=restore; btn.style.color='#bbb'; btn.style.borderColor='rgba(255,255,255,0.25)'; },1100); }; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(()=>fallbackCopy(text,ok)); } else fallbackCopy(text,ok); }
+const copyBtn=(text,title)=>'<button onclick="copyCad(this,\''+text+'\')" title="'+title+'" aria-label="'+title+'" style="display:inline-flex;align-items:center;background:none;border:1px solid rgba(255,255,255,0.25);border-radius:3px;color:#bbb;cursor:pointer;padding:2px 5px;line-height:1;flex-shrink:0;vertical-align:middle"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>';
 function popupHTML(rec, cname){
   const ot=OTC[rec.ot]||['—','#888']; let h='<div style="font-size:12px;line-height:1.5;max-width:300px;color:#e8e8ea">';
-  h+='<div style="font-family:ui-monospace,monospace;color:#e8c547;font-weight:600;word-break:break-all">'+esc(rec.c)+'</div>';
+  h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;color:#e8c547;font-weight:600;word-break:break-all">'+esc(rec.c)+'</span>'+copyBtn(rec.c,'Скопировать кадастр (УКР)')+'</div>';
   h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px">'+(cname?esc(cname):'')+(rec.a!=null?(cname?' · ':'')+rec.a+' га':'')+'</div>';
   const rai=raionOf(rec.c); if(rai) h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px;margin-top:-2px">'+esc(rai)+'</div>';
   if(rec.o) h+='<div><span style="color:#8b91a8">собств.:</span> '+esc(rec.o)+'</div>';
   h+='<div style="color:'+ot[1]+';font-size:10px;margin-top:4px">'+ot[0]+'</div>';
-  if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</div></div>';
+  if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</span>'+copyBtn(rec.mz,'Скопировать кадастр РФ')+'</div></div>';
   return h+'</div>';
 }
 let boxDragged=false;
