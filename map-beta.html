@@ -81,8 +81,8 @@ const KHERSON_BOUNDS = [[31.80, 45.90], [35.10, 47.45]];   // [[з,ю],[в,с]]
 const map = new maplibregl.Map({
   container: 'map',
   attributionControl: false,
-  bounds: KHERSON_BOUNDS, fitBoundsOptions: { padding: 12 },
-  minZoom: 8,            // тайлсет участков начинается с z8 — стартовый кадр НЕ должен опускаться ниже, иначе MapLibre не запрашивает тайлы и полигоны пропадают
+  bounds: KHERSON_BOUNDS, fitBoundsOptions: { padding: 76 },   // ~2 см отступа от краёв — вся область в кадре с полями
+  minZoom: 6,            // тайлсет участков теперь с z6 — стартовый fitBounds может уместить ВСЮ область даже на узких экранах (на старте setMinZoom фиксирует фактический зум — отдалять ниже нельзя)
   maxZoom: 19,
   fadeDuration: 0,
   style: {
@@ -93,7 +93,7 @@ const map = new maplibregl.Map({
       base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
       sat: { type:'raster', tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize:256, maxzoom:19 },
       omt: { type:'vector', url:'https://tiles.openfreemap.org/planet', attribution:'© OpenMapTiles' },
-      parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:8, maxzoom:14 }
+      parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:6, maxzoom:14 }
     },
     layers: [
       { id:'light', type:'raster', source:'light' },
@@ -498,8 +498,11 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(true);   // по умолчанию светлая подложка → тёмные подписи
-  map.fitBounds(KHERSON_BOUNDS, { padding: 12, duration: 0 });   // гарантируем кадр на всю область (после раскладки контейнера)
-  map.once('idle', ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); applyPanLock(); });
+  map.fitBounds(KHERSON_BOUNDS, { padding: 76, duration: 0 });   // ~2 см отступа: вся область в кадре с полями (после раскладки контейнера)
+  // фиксируем стартовый зум как минимальный → зум-аут (колесо/жест/кнопка) заблокирован ниже стартового вида
+  const lockStart = ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); applyPanLock(); };
+  map.once('idle', lockStart);
+  setTimeout(lockStart, 400);   // страховка, если idle уже прошёл
 });
 
 // Рамка-выделение: Shift+перетаскивание

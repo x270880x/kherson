@@ -27,7 +27,7 @@ out.close()
 PY
 
 rm -rf tiles
-tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o \
+tippecanoe -e tiles -l parcels -P -Z6 -z14 -y o \
   --drop-densest-as-needed --maximum-tile-bytes 2000000 \
   --no-tile-compression --force --name="Kherson parcels" "$TMP"
 echo "tiles: $(find tiles -name '*.pbf' | wc -l | tr -d ' ') files, $(du -sh tiles | cut -f1)"
