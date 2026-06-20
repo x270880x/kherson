@@ -8,9 +8,9 @@
 "bounds": "31.530253,45.768354,35.103184,47.599940",
 "antimeridian_adjusted_bounds": "31.530253,45.768354,35.103184,47.599940",
 "type": "overlay",
-"strategies": "[{},{},{},{},{},{},{},{},{\"dropped_as_needed\":479299,\"tiny_polygons\":95739,\"tile_size_desired\":4236555,\"feature_count_desired\":214420},{\"tiny_polygons\":85047},{\"tiny_polygons\":26963},{\"tiny_polygons\":13888},{\"tiny_polygons\":7876},{\"tiny_polygons\":1763},{\"tiny_polygons\":710}]",
+"strategies": "[{},{},{},{},{},{},{},{},{\"dropped_as_needed\":493496,\"tiny_polygons\":95236,\"tile_size_desired\":4220401,\"feature_count_desired\":217009},{\"tiny_polygons\":85542},{\"tiny_polygons\":27273},{\"tiny_polygons\":14118},{\"tiny_polygons\":8060},{\"tiny_polygons\":1793},{\"tiny_polygons\":728}]",
 "format": "pbf",
 "generator": "tippecanoe v2.79.0",
-"generator_options": "tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o --drop-densest-as-needed --maximum-tile-bytes 2000000 --no-tile-compression --force '--name=Kherson parcels' /var/folders/4w/fdk7mj7x1d79ncrcv70w98sh0000gn/T/tmp.BMz1UBQCSA/all_parcels.geojsonl",
-"json": "{\"vector_layers\":[{\"id\":\"parcels\",\"description\":\"\",\"minzoom\":8,\"maxzoom\":14,\"fields\":{\"o\":\"String\"}}],\"tilestats\":{\"layerCount\":1,\"layers\":[{\"layer\":\"parcels\",\"count\":600363,\"geometry\":\"Polygon\",\"attributeCount\":1,\"attributes\":[{\"attribute\":\"o\",\"count\":4,\"type\":\"string\",\"values\":[\"g\",\"k\",\"n\",\"p\"]}]}]}}"
+"generator_options": "tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o --drop-densest-as-needed --maximum-tile-bytes 2000000 --no-tile-compression --force '--name=Kherson parcels' /var/folders/4w/fdk7mj7x1d79ncrcv70w98sh0000gn/T/tmp.qrqPcYbEnZ/all_parcels.geojsonl",
+"json": "{\"vector_layers\":[{\"id\":\"parcels\",\"description\":\"\",\"minzoom\":8,\"maxzoom\":14,\"fields\":{\"o\":\"String\"}}],\"tilestats\":{\"layerCount\":1,\"layers\":[{\"layer\":\"parcels\",\"count\":613335,\"geometry\":\"Polygon\",\"attributeCount\":1,\"attributes\":[{\"attribute\":\"o\",\"count\":4,\"type\":\"string\",\"values\":[\"g\",\"k\",\"n\",\"p\"]}]}]}}"
 }
