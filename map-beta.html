@@ -197,13 +197,13 @@ function addCouncilLabels(){
   const LABEL_HIDE=new Set(['6523855000']);   // дубль-подпись «Нижние Серогозы — поля общины» рядом с самим смт — текст не выводим (участки остаются)
   const feats=pts.filter(c=>!LABEL_HIDE.has(c.c)).map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n).replace(/^пгт\s+/i,''),total:c.total||0,ctr:centers.has(c.c),big:BIG_TOWNS.has(c.c),offLow:OFFLOW[c.c]}}));
   // Херсон (~280k) отсутствует в данных как единый НП — добавляем вручную как центр (на обзоре виден)
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0]}});   //   — волосяной пробел (звезда ближе к слову)
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0],rpfx:'201'}});   //   — волосяной пробел (звезда ближе к слову)
   // Верхній Рогачик (центр Верхнерогачикского р-на) отсутствует в данных — добавляем вручную как центр
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true}});
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true,rpfx:'215'}});
   // Велика Олександрівка (центр Великоалександровского р-на) отсутствует в данных — добавляем вручную как центр
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.2786,47.2536]},properties:{name:'Великая Александровка',total:5000,ctr:true}});
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.2786,47.2536]},properties:{name:'Великая Александровка',total:5000,ctr:true,rpfx:'209'}});
   // Нововоронцовка (центр Нововоронцовского р-на) — в данных только Дудчаны; центр добавляем вручную
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.8703,47.4986]},properties:{name:'Нововоронцовка',total:5000,ctr:true}});
+  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.8703,47.4986]},properties:{name:'Нововоронцовка',total:5000,ctr:true,rpfx:'241'}});
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
   // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
   map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:8.5, filter:['!',['get','ctr']],
@@ -359,7 +359,7 @@ map.on('click','lbl-centers', e=>{
     let best=null,bd=1e9;
     for(const c of CIDX){ if(!c.lat||!c.lon) continue; const d=(c.lat-lat)**2+(c.lon-lng)**2; if(d<bd){bd=d;best=c;} }
     if(best){
-      const rname=raionOf(best.c);              // по имени района (не префиксу) — корректно для многопрефиксных (Генический 211+221, Херсон 101/201)
+      const rname=(f.properties.rpfx&&RAION_BY_PREFIX[f.properties.rpfx])||raionOf(best.c);   // ручные центры несут rpfx (точный район); иначе — по ближайшему совету (для вычисленных центров best=сам совет)
       const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):CIDX.filter(c=>c.c.slice(2,5)===best.c.slice(2,5))).filter(c=>c.lat&&c.lon);
       if(rc.length){
         const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг кликнутого центра → он строго по центру экрана, район целиком в кадре
@@ -482,7 +482,7 @@ map.on('load', ()=>{
 // Рамка-выделение: Shift+перетаскивание
 map.boxZoom.disable();
 let bs=null, bsRect=null;
-map.on('mousedown', e=>{ if(!e.originalEvent.shiftKey) return; bs={x:e.point.x,y:e.point.y,ll:e.lngLat}; map.dragPan.disable(); });
+map.on('mousedown', e=>{ if(!e.originalEvent.shiftKey){ boxDragged=false; return; } bs={x:e.point.x,y:e.point.y,ll:e.lngLat}; map.dragPan.disable(); });   // сбрасываем флаг на обычном mousedown: после рамки >3px нативный click не дублируется (clickTolerance) и флаг иначе залипает, глотая след. клик
 map.on('mousemove', e=>{ if(!bs) return; if(!bsRect){ bsRect=document.createElement('div'); document.body.appendChild(bsRect); } const x0=Math.min(bs.x,e.point.x),y0=Math.min(bs.y,e.point.y),w=Math.abs(e.point.x-bs.x),h=Math.abs(e.point.y-bs.y); const r=map.getCanvas().getBoundingClientRect(); bsRect.style.cssText='position:fixed;border:1px dashed #e8c547;background:rgba(232,197,71,.12);z-index:7;pointer-events:none;left:'+(r.left+x0)+'px;top:'+(r.top+y0)+'px;width:'+w+'px;height:'+h+'px'; });
 map.on('mouseup', async e=>{
   const start=bs, rect=bsRect; bs=null; bsRect=null; applyPanLock(); if(rect) rect.remove();
