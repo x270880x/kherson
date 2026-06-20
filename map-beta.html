@@ -292,12 +292,12 @@ function fitNearestN(lng, lat, n){
   const pts = CIDX.filter(c=>c.lat&&c.lon)
     .map(c=>({c, d:(c.lat-lat)**2+(c.lon-lng)**2}))
     .sort((a,b)=>a.d-b.d).slice(0, n).map(o=>o.c);
-  if(!pts.length){ map.easeTo({center:[lng,lat],duration:700,essential:true}); return; }
+  if(!pts.length){ map.easeTo({center:[lng,lat],zoom:map.getZoom()+1,duration:700,essential:true}); return; }
   const rLon=Math.max(...pts.map(c=>Math.abs(c.lon-lng)));   // симметричная рамка вокруг кликнутого → он строго в центре
   const rLat=Math.max(...pts.map(c=>Math.abs(c.lat-lat)));
   const box=[[lng-rLon-.01,lat-rLat-.01],[lng+rLon+.01,lat+rLat+.01]];
   const cam=map.cameraForBounds(box,{padding:40,maxZoom:13});
-  const z=Math.max(cam?cam.zoom:map.getZoom(), map.getZoom());   // уже приближён — НЕ отдаляем (только центрируем/приближаем)
+  const z=Math.max(cam?cam.zoom:map.getZoom(), map.getZoom()+1);   // всегда приближаем минимум на 1 уровень (×2): после района клик по селу приближает его, не отдаляет
   map.easeTo({center:[lng,lat], zoom:z, duration:700, essential:true});
 }
 // Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
