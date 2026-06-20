@@ -5,12 +5,12 @@
 "minzoom": "8",
 "maxzoom": "14",
 "center": "32.904053,46.111325,14",
-"bounds": "31.799841,45.947316,35.103184,47.420757",
-"antimeridian_adjusted_bounds": "31.799841,45.947316,35.103184,47.420757",
+"bounds": "31.530253,45.768354,35.103184,47.425886",
+"antimeridian_adjusted_bounds": "31.530253,45.768354,35.103184,47.425886",
 "type": "overlay",
-"strategies": "[{},{},{},{},{},{},{},{},{\"dropped_as_needed\":421915,\"tiny_polygons\":87620,\"tile_size_desired\":4234625,\"feature_count_desired\":211133},{\"tiny_polygons\":80186},{\"tiny_polygons\":24963},{\"tiny_polygons\":12341},{\"tiny_polygons\":6899},{\"tiny_polygons\":1461},{\"tiny_polygons\":630}]",
+"strategies": "[{},{},{},{},{},{},{},{},{\"dropped_as_needed\":443598,\"tiny_polygons\":90825,\"tile_size_desired\":4228113,\"feature_count_desired\":214465},{\"tiny_polygons\":81804},{\"tiny_polygons\":25611},{\"tiny_polygons\":12877},{\"tiny_polygons\":7271},{\"tiny_polygons\":1507},{\"tiny_polygons\":667}]",
 "format": "pbf",
 "generator": "tippecanoe v2.79.0",
-"generator_options": "tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o --drop-densest-as-needed --maximum-tile-bytes 2000000 --no-tile-compression --force '--name=Kherson parcels' /var/folders/4w/fdk7mj7x1d79ncrcv70w98sh0000gn/T/tmp.29O42jH33i/all_parcels.geojsonl",
-"json": "{\"vector_layers\":[{\"id\":\"parcels\",\"description\":\"\",\"minzoom\":8,\"maxzoom\":14,\"fields\":{\"o\":\"String\"}}],\"tilestats\":{\"layerCount\":1,\"layers\":[{\"layer\":\"parcels\",\"count\":530600,\"geometry\":\"Polygon\",\"attributeCount\":1,\"attributes\":[{\"attribute\":\"o\",\"count\":4,\"type\":\"string\",\"values\":[\"g\",\"k\",\"n\",\"p\"]}]}]}}"
+"generator_options": "tippecanoe -e tiles -l parcels -P -Z8 -z14 -y o --drop-densest-as-needed --maximum-tile-bytes 2000000 --no-tile-compression --force '--name=Kherson parcels' /var/folders/4w/fdk7mj7x1d79ncrcv70w98sh0000gn/T/tmp.j9pDO4IYIy/all_parcels.geojsonl",
+"json": "{\"vector_layers\":[{\"id\":\"parcels\",\"description\":\"\",\"minzoom\":8,\"maxzoom\":14,\"fields\":{\"o\":\"String\"}}],\"tilestats\":{\"layerCount\":1,\"layers\":[{\"layer\":\"parcels\",\"count\":556355,\"geometry\":\"Polygon\",\"attributeCount\":1,\"attributes\":[{\"attribute\":\"o\",\"count\":4,\"type\":\"string\",\"values\":[\"g\",\"k\",\"n\",\"p\"]}]}]}}"
 }
