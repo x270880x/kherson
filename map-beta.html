@@ -498,11 +498,22 @@ map.on('load', ()=>{
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
   map.addLayer({id:'basket-line',type:'line',source:'basket',paint:{'line-color':'#ffec3d','line-width':2}});
   setBaseLabels(false);   // по умолчанию ТЁМНАЯ подложка → светлые подписи
-  map.fitBounds(KHERSON_BOUNDS, { padding: 0, duration: 0 });   // вся область до краёв кадра (после раскладки контейнера)
-  // фиксируем стартовый зум как минимальный → зум-аут (колесо/жест/кнопка) заблокирован ниже стартового вида
-  const lockStart = ()=>{ map.setMinZoom(map.getZoom()); updateZoutBtn(); applyPanLock(); };
-  map.once('idle', lockStart);
-  setTimeout(lockStart, 400);   // страховка, если idle уже прошёл
+  // Старт на 1 пункт ближе «полной области»; зум-аут разрешён на 2 пункта (до fit−1), дальше заблокирован.
+  // cameraForBounds детерминированно считает зум подгонки (не зависит от текущей камеры/гонки раскладки).
+  let started=false;
+  const setupStart = ()=>{
+    if(started) return;
+    const cam = map.cameraForBounds(KHERSON_BOUNDS, { padding: 0 });
+    if(!cam || !isFinite(cam.zoom)) return;   // контейнер ещё не разложен — повторим по таймеру
+    started=true;
+    const fz = cam.zoom;                       // «вся область в кадре»
+    map.setMinZoom(fz - 1);                     // нижний предел = на 2 пункта ниже старта
+    map.jumpTo({ center: cam.center, zoom: fz + 1 });   // стартовый кадр — на 1 пункт ближе
+    updateZoutBtn(); applyPanLock();
+  };
+  map.once('idle', setupStart);
+  setTimeout(setupStart, 300);
+  setTimeout(setupStart, 800);   // страховка, если контейнер разложился позже
 });
 
 // Рамка-выделение: Shift+перетаскивание
