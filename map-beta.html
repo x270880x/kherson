@@ -105,7 +105,7 @@ const map = new maplibregl.Map({
         paint:{ 'text-color':'#8fb6e0', 'text-halo-color':'#0f1117', 'text-halo-width':1.1 } },
       { id:'lbl-place', type:'symbol', source:'omt', 'source-layer':'place',
         filter:['in',['get','class'],['literal',['city','town']]],
-        layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name:latin'],['get','name']], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['exponential',1.2],['zoom'],6,11,11,15], 'text-max-width':8 },
+        layout:{ 'text-field':['coalesce',['get','name:ru'],['get','name:latin'],['get','name']], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['exponential',1.2],['zoom'],6,13.2,11,18], 'text-max-width':8 },
         paint:{ 'text-color':'#eef1f6', 'text-halo-color':'#0f1117', 'text-halo-width':1.4 } },
       { id:'lbl-state', type:'symbol', source:'omt', 'source-layer':'place',   // подписи СОСЕДНИХ областей — вдвое мельче и тусклее (Херсонская исключена — у неё кастомный титул)
         filter:['all',['==',['get','class'],'state'],['!=',['coalesce',['get','name:ru'],['get','name:latin'],['get','name']],'Херсонская область']],
@@ -206,11 +206,11 @@ function addCouncilLabels(){
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
   // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
   map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:8.5, filter:['!',['get','ctr']],
-    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['linear'],['zoom'],8,9.5,12,12], 'text-max-width':7, 'symbol-sort-key':['-',['get','total']] },
+    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['linear'],['zoom'],8,11.4,12,14.4], 'text-max-width':7, 'symbol-sort-key':['-',['get','total']] },
     paint:{ 'text-color':'#1f2433', 'text-halo-color':'#ffffff', 'text-halo-width':1.2 } });
   // (2) ГЛАВНЫЕ сёла/города районов — БОЛД и ×1.5; вставлен ПЕРЕД lbl-place → приоритет коллизии (OMT-дубль уступает)
   map.addLayer({ id:'lbl-centers', type:'symbol', source:'councils', minzoom:7, filter:['any',['get','ctr'],['get','big']],
-    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Bold'], 'text-size':['interpolate',['linear'],['zoom'],8,['case',['==',['get','capital'],true],15.39,10.26],12,['case',['==',['get','capital'],true],19.44,12.96]], 'text-letter-spacing':['case',['==',['get','capital'],true],-0.02,0.06], 'text-offset':['step',['zoom'],['coalesce',['get','offLow'],['literal',[0,0]]],10,['literal',[0,0]]], 'text-max-width':8, 'symbol-sort-key':['-',['get','total']], 'text-allow-overlap':true },
+    layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Bold'], 'text-size':['interpolate',['linear'],['zoom'],8,['case',['==',['get','capital'],true],15.39,12.31],12,['case',['==',['get','capital'],true],19.44,15.55]], 'text-letter-spacing':['case',['==',['get','capital'],true],-0.02,0.06], 'text-offset':['step',['zoom'],['coalesce',['get','offLow'],['literal',[0,0]]],10,['literal',[0,0]]], 'text-max-width':8, 'symbol-sort-key':['-',['get','total']], 'text-allow-overlap':true },
     paint:{ 'text-color':'#10182b', 'text-halo-color':'#ffffff', 'text-halo-width':1.7 } }, 'lbl-place');
   // (1) Приглушить OMT-подписи ВНЕ Херсонской области: оболочка советов → within (внутри opacity 1, снаружи 0.4)
   const hull={type:'Polygon',coordinates:[convexHull(pts.map(c=>[c.lon,c.lat]))]};
@@ -285,8 +285,9 @@ function fitNearestN(lng, lat, n){
     .map(c=>({c, d:(c.lat-lat)**2+(c.lon-lng)**2}))
     .sort((a,b)=>a.d-b.d).slice(0, n).map(o=>o.c);
   if(!pts.length){ map.flyTo({center:[lng,lat],zoom:12,duration:700,essential:true}); return; }
-  const lo=pts.map(c=>c.lon), la=pts.map(c=>c.lat);
-  map.fitBounds([[Math.min(...lo)-.01,Math.min(...la)-.01],[Math.max(...lo)+.01,Math.max(...la)+.01]],{padding:40,maxZoom:13,duration:700,essential:true});
+  const rLon=Math.max(...pts.map(c=>Math.abs(c.lon-lng)));   // симметричная рамка вокруг кликнутого → он строго в центре
+  const rLat=Math.max(...pts.map(c=>Math.abs(c.lat-lat)));
+  map.fitBounds([[lng-rLon-.01,lat-rLat-.01],[lng+rLon+.01,lat+rLat+.01]],{padding:40,maxZoom:13,duration:700,essential:true});
 }
 // Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
 map.on('click','lbl-place', e=>{
