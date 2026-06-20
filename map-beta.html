@@ -250,8 +250,8 @@ function popupHTML(rec, cname){
 let boxDragged=false;
 map.on('click', 'parcels-fill', async e => {
   if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
-  const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]);
-  if(map.queryRenderedFeatures(e.point,{layers:_lbls}).length) return;   // клик по названию НП (OMT или наш совет) → зум, не плашка участка
+  const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]).concat(map.getLayer('lbl-centers')?['lbl-centers']:[]);
+  if(map.queryRenderedFeatures(e.point,{layers:_lbls}).length) return;   // клик по названию НП (OMT / наш совет / центр) → зум, не плашка участка
   const visPlaces=map.queryRenderedFeatures({layers:['lbl-place']}).filter(f=>['city','town','village','hamlet'].includes(f.properties&&f.properties.class));
   if(visPlaces.length>10) return;   // слишком крупный план — участки не кликабельны
   const x=e.lngLat.lng, y=e.lngLat.lat, shift=e.originalEvent && e.originalEvent.shiftKey;
@@ -335,6 +335,28 @@ map.on('click','lbl-councils', e=>{
   if(near.length){ const lo=near.map(c=>c.lon),la=near.map(c=>c.lat); map.fitBounds([[Math.min(...lo)-.02,Math.min(...la)-.02],[Math.max(...lo)+.02,Math.max(...la)+.02]],{padding:30,maxZoom:13,duration:700,essential:true}); return; }
   map.flyTo({center:e.lngLat,zoom:12,duration:700,essential:true});
 });
+// Клик по подписи РАЙЦЕНТРА (наш слой центров) → плавный зум во ВЕСЬ район (медленно)
+map.on('click','lbl-centers', e=>{
+  const f=e.features&&e.features[0]; if(!f) return;
+  if(!f.properties.ctr) return;                 // крупный НП, но не центр → пусть обработает lbl-councils (зум в село)
+  const lat=e.lngLat.lat, lng=e.lngLat.lng;
+  if(CIDX.length){
+    let best=null,bd=1e9;
+    for(const c of CIDX){ if(!c.lat||!c.lon) continue; const d=(c.lat-lat)**2+(c.lon-lng)**2; if(d<bd){bd=d;best=c;} }
+    if(best){
+      const rname=raionOf(best.c);              // по имени района (не префиксу) — корректно для многопрефиксных (Генический 211+221, Херсон 101/201)
+      const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):CIDX.filter(c=>c.c.slice(2,5)===best.c.slice(2,5))).filter(c=>c.lat&&c.lon);
+      if(rc.length){
+        const lo=rc.map(c=>c.lon).concat(lng), la=rc.map(c=>c.lat).concat(lat);   // + сам центр, чтобы кликнутая метка осталась в кадре (важно для Нововоронцовки: в районе только Дудчаны)
+        map.fitBounds([[Math.min(...lo)-.03,Math.min(...la)-.03],[Math.max(...lo)+.03,Math.max(...la)+.03]],{padding:40,duration:1600,essential:true});
+        return;
+      }
+    }
+  }
+  map.flyTo({center:e.lngLat,zoom:9,duration:1600,essential:true});
+});
+map.on('mouseenter','lbl-centers', ()=>{ map.getCanvas().style.cursor='pointer'; });
+map.on('mouseleave','lbl-centers', ()=>{ map.getCanvas().style.cursor=''; });
 
 // Переключатели форм собственности — показать/скрыть по ВСЕЙ карте (вкл. частные)
 const ownActive = new Set(['p','k','g','n']);
