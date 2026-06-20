@@ -542,16 +542,38 @@ function matchLease(rec){ const y=rec.ey; if(fine.ly==='none') return !y; if(fin
 const FINE_MINZOOM=13;
 function fineHint(t){ const el=document.getElementById('fine-hint'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; }
 let fineRun=false, finePend=false;
+// Межевание — глобальный слой razmezh (есть на всех зумах), поэтому фильтр работает и на старте без порога зума
+function setRazmezh(mz){
+  if(!map.getLayer('razmezh-fill')) return;
+  if(mz==='yes'){   // только размежёванные — фиолетовые видны солидно на любом зуме
+    map.setLayoutProperty('razmezh-fill','visibility','visible'); map.setLayoutProperty('razmezh-line','visibility','visible');
+    map.setPaintProperty('razmezh-fill','fill-opacity',0.6);
+  } else if(mz==='no'){   // только без межевания — слой межевания скрыт
+    map.setLayoutProperty('razmezh-fill','visibility','none'); map.setLayoutProperty('razmezh-line','visibility','none');
+  } else {   // по умолчанию — лёгкая заливка, гаснущая к z13 (как было)
+    map.setLayoutProperty('razmezh-fill','visibility','visible'); map.setLayoutProperty('razmezh-line','visibility','visible');
+    map.setPaintProperty('razmezh-fill','fill-opacity',['interpolate',['linear'],['zoom'],8,0.35,13,0]);
+  }
+}
 async function fineUpdate(){
   if(fineRun){ finePend=true; return; }
   fineRun=true;
   try{
     do{
       finePend=false;
-      const overlay = hasFine() && map.getZoom()>=FINE_MINZOOM;
+      setRazmezh(fine.mz);
+      const otherFine = !!(fine.ct||fine.ly||fine.r);   // эти фильтры требуют поучастковых данных → порог z13
+      // Только межевание (или ничего) — работает на любом зуме через глобальный razmezh, без подсказки
+      if(!otherFine){
+        map.getSource('fine')&&map.getSource('fine').setData(EMPTY); fineHint('');
+        const hideMain = fine.mz==='yes';   // показываем ТОЛЬКО размежёванные → прячем основной слой участков
+        if(map.getLayer('parcels-fill')) map.setLayoutProperty('parcels-fill','visibility', hideMain?'none':'visible');
+        if(map.getLayer('parcels-line')) map.setLayoutProperty('parcels-line','visibility', hideMain?'none':'visible');
+        break;
+      }
+      const overlay = map.getZoom()>=FINE_MINZOOM;
       if(map.getLayer('parcels-fill')) map.setLayoutProperty('parcels-fill','visibility', overlay?'none':'visible');
       if(map.getLayer('parcels-line')) map.setLayoutProperty('parcels-line','visibility', overlay?'none':'visible');
-      if(!hasFine()){ map.getSource('fine')&&map.getSource('fine').setData(EMPTY); fineHint(''); break; }
       if(!overlay){ map.getSource('fine')&&map.getSource('fine').setData(EMPTY); fineHint('Приблизьте, чтобы применить фильтр'); break; }
       fineHint('');
       const b=map.getBounds(); const cs=CIDX.filter(c=>b.contains([c.lon,c.lat])).slice(0,14);
