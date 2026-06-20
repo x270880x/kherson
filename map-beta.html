@@ -311,8 +311,9 @@ map.on('click','lbl-place', e=>{
         const pfx=best.c.slice(2,5);
         const rc=CIDX.filter(c=>c.c.slice(2,5)===pfx&&c.lat&&c.lon);
         if(rc.length){
-          const lo=rc.map(c=>c.lon),la=rc.map(c=>c.lat);
-          map.fitBounds([[Math.min(...lo)-.03,Math.min(...la)-.03],[Math.max(...lo)+.03,Math.max(...la)+.03]],{padding:40,duration:1600,essential:true});
+          const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг клика → точка по центру
+          const cam=map.cameraForBounds([[lng-rLon-.03,lat-rLat-.03],[lng+rLon+.03,lat+rLat+.03]],{padding:40});
+          map.easeTo({center:[lng,lat], zoom:cam?cam.zoom:9, duration:1600, essential:true});
           return;
         }
       }
@@ -361,8 +362,9 @@ map.on('click','lbl-centers', e=>{
       const rname=raionOf(best.c);              // по имени района (не префиксу) — корректно для многопрефиксных (Генический 211+221, Херсон 101/201)
       const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):CIDX.filter(c=>c.c.slice(2,5)===best.c.slice(2,5))).filter(c=>c.lat&&c.lon);
       if(rc.length){
-        const lo=rc.map(c=>c.lon).concat(lng), la=rc.map(c=>c.lat).concat(lat);   // + сам центр, чтобы кликнутая метка осталась в кадре (важно для Нововоронцовки: в районе только Дудчаны)
-        map.fitBounds([[Math.min(...lo)-.03,Math.min(...la)-.03],[Math.max(...lo)+.03,Math.max(...la)+.03]],{padding:40,duration:1600,essential:true});
+        const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг кликнутого центра → он строго по центру экрана, район целиком в кадре
+        const cam=map.cameraForBounds([[lng-rLon-.03,lat-rLat-.03],[lng+rLon+.03,lat+rLat+.03]],{padding:40});
+        map.easeTo({center:[lng,lat], zoom:cam?cam.zoom:9, duration:1600, essential:true});
         return;
       }
     }
