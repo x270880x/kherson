@@ -205,7 +205,7 @@ function addCouncilLabels(){
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.8703,47.4986]},properties:{name:'Нововоронцовка',total:5000,ctr:true}});
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
   // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
-  map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:10, filter:['!',['get','ctr']],
+  map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:8.5, filter:['!',['get','ctr']],
     layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Regular'], 'text-size':['interpolate',['linear'],['zoom'],8,9.5,12,12], 'text-max-width':7, 'symbol-sort-key':['-',['get','total']] },
     paint:{ 'text-color':'#1f2433', 'text-halo-color':'#ffffff', 'text-halo-width':1.2 } });
   // (2) ГЛАВНЫЕ сёла/города районов — БОЛД и ×1.5; вставлен ПЕРЕД lbl-place → приоритет коллизии (OMT-дубль уступает)
@@ -279,6 +279,15 @@ map.on('mouseenter','parcels-fill',e=>{ map.getCanvas().style.cursor='pointer'; 
 map.on('mousemove','parcels-fill',e=>{ if(pfQueued) return; pfQueued=true; requestAnimationFrame(()=>{ pfQueued=false; prefetchNear(e.lngLat); }); });
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
 
+// Зум так, чтобы в кадре было ~n ближайших НП (кликнутый — в центре)
+function fitNearestN(lng, lat, n){
+  const pts = CIDX.filter(c=>c.lat&&c.lon)
+    .map(c=>({c, d:(c.lat-lat)**2+(c.lon-lng)**2}))
+    .sort((a,b)=>a.d-b.d).slice(0, n).map(o=>o.c);
+  if(!pts.length){ map.flyTo({center:[lng,lat],zoom:12,duration:700,essential:true}); return; }
+  const lo=pts.map(c=>c.lon), la=pts.map(c=>c.lat);
+  map.fitBounds([[Math.min(...lo)-.01,Math.min(...la)-.01],[Math.max(...lo)+.01,Math.max(...la)+.01]],{padding:40,maxZoom:13,duration:700,essential:true});
+}
 // Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
 map.on('click','lbl-place', e=>{
   const f=e.features&&e.features[0]; if(!f) return;
@@ -303,16 +312,8 @@ map.on('click','lbl-place', e=>{
     return;
   }
 
-  // city/town/village/hamlet — fitBounds на это село + ближайшие ~13км советов
-  if(CIDX.length){
-    const near=CIDX.filter(c=>Math.abs(c.lat-lat)<0.12&&Math.abs(c.lon-lng)<0.16&&c.lat&&c.lon);
-    if(near.length){
-      const lo=near.map(c=>c.lon),la=near.map(c=>c.lat);
-      map.fitBounds([[Math.min(...lo)-.02,Math.min(...la)-.02],[Math.max(...lo)+.02,Math.max(...la)+.02]],{padding:30,maxZoom:13,duration:700,essential:true});
-      return;
-    }
-  }
-  map.flyTo({center:e.lngLat,zoom:12,duration:700,essential:true});
+  // city/town/village/hamlet — зум так, чтобы вокруг было ~8–10 НП
+  fitNearestN(lng, lat, 10);
 });
 // Наведение на НП → табличка форм собственности ближайшего совета (счётчики участков)
 const hoverPop = new maplibregl.Popup({ closeButton:false, closeOnClick:false, offset:12, maxWidth:'none', className:'rt-hover-pop' });
@@ -329,12 +330,7 @@ const clearHover=()=>{ map.getCanvas().style.cursor=''; hoverPop.remove(); };
 map.on('mouseleave','lbl-place', clearHover);
 map.on('mouseleave','lbl-councils', clearHover);
 // Клик по подписи совета (наш слой) → приближение к селу + соседним (как у lbl-place city/village)
-map.on('click','lbl-councils', e=>{
-  const lat=e.lngLat.lat, lng=e.lngLat.lng;
-  const near=CIDX.filter(c=>Math.abs(c.lat-lat)<0.12&&Math.abs(c.lon-lng)<0.16&&c.lat&&c.lon);
-  if(near.length){ const lo=near.map(c=>c.lon),la=near.map(c=>c.lat); map.fitBounds([[Math.min(...lo)-.02,Math.min(...la)-.02],[Math.max(...lo)+.02,Math.max(...la)+.02]],{padding:30,maxZoom:13,duration:700,essential:true}); return; }
-  map.flyTo({center:e.lngLat,zoom:12,duration:700,essential:true});
-});
+map.on('click','lbl-councils', e=>{ fitNearestN(e.lngLat.lng, e.lngLat.lat, 10); });
 // Клик по подписи РАЙЦЕНТРА (наш слой центров) → плавный зум во ВЕСЬ район (медленно)
 map.on('click','lbl-centers', e=>{
   const f=e.features&&e.features[0]; if(!f) return;
