@@ -330,15 +330,12 @@ const hoverPop = new maplibregl.Popup({ closeButton:false, closeOnClick:false, o
 document.head.insertAdjacentHTML('beforeend','<style>.rt-hover-pop{pointer-events:none}.rt-hover-pop .maplibregl-popup-content{padding:7px 9px}</style>');
 function ownTableHTML(c){
   const o=c.o||{}, tot=c.total||0, ha=c.ha, rai=raionOf(c.c), cats=['p','k','g','n'];
-  const sum=cats.reduce((s,k)=>s+(o[k]||0),0)||1;
-  const bar=cats.map(k=>{ const v=o[k]||0; if(!v) return ''; return '<span style="width:'+(v/sum*100).toFixed(2)+'%;background:'+OWN[k][1]+';height:100%;display:block"></span>'; }).join('');
   const nums=cats.map(k=>'<div style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:'+OWN[k][1]+';flex-shrink:0"></span><b style="font-family:ui-monospace,monospace;color:#e8e8ea;font-weight:600">'+(o[k]||0).toLocaleString('ru')+'</b></div>').join('');
   return '<div style="font-size:11px;line-height:1.5;min-width:190px">'
     +'<div style="color:#e8c547;font-weight:600">'+esc(ruName(c.n))+'</div>'
     +(rai?'<div style="color:#8b91a8;font-size:10px">'+esc(rai)+'</div>':'')
     +'<div style="color:#cfd3df;font-family:ui-monospace,monospace;margin:3px 0 5px">'+tot.toLocaleString('ru')+' уч.'+(ha!=null?' · '+ha.toLocaleString('ru')+' га':'')+'</div>'
-    +'<div style="display:flex;height:8px;border-radius:3px;overflow:hidden;background:#2a2f42">'+bar+'</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:5px 13px;margin-top:5px">'+nums+'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:5px 13px">'+nums+'</div>'
     +'</div>';
 }
 function nearestCouncil(lon,lat){ let best=null,bd=1e9; for(const c of CIDX){ const d=(c.lat-lat)**2+(c.lon-lon)**2; if(d<bd){bd=d;best=c;} } return {best,bd}; }
