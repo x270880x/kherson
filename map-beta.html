@@ -202,8 +202,7 @@ function addCouncilLabels(){
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true,rpfx:'215'}});
   // Велика Олександрівка (центр Великоалександровского р-на) отсутствует в данных — добавляем вручную как центр
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.2786,47.2536]},properties:{name:'Великая Александровка',total:5000,ctr:true,rpfx:'209'}});
-  // Нововоронцовка (центр Нововоронцовского р-на) — в данных только Дудчаны; центр добавляем вручную
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.8703,47.4986]},properties:{name:'Нововоронцовка',total:5000,ctr:true,rpfx:'241'}});
+  // Нововоронцовка: район 241 теперь есть в данных (смт + 12 сёл) — центр определяется автоматически, ручной плейсхолдер убран.
   map.addSource('councils',{type:'geojson',data:{type:'FeatureCollection',features:feats}});
   // обычные сёла/пгт (НЕ центры) — добавлены поверх lbl-place: OMT-города в приоритете, наши заполняют пробелы
   map.addLayer({ id:'lbl-councils', type:'symbol', source:'councils', minzoom:8.5, filter:['!',['get','ctr']],
