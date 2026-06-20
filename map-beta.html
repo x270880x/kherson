@@ -292,13 +292,20 @@ function fitNearestN(lng, lat, n){
   const pts = CIDX.filter(c=>c.lat&&c.lon)
     .map(c=>({c, d:(c.lat-lat)**2+(c.lon-lng)**2}))
     .sort((a,b)=>a.d-b.d).slice(0, n).map(o=>o.c);
-  if(!pts.length){ map.easeTo({center:[lng,lat],zoom:map.getZoom()+1,duration:700,essential:true}); return; }
+  if(!pts.length){ map.easeTo({center:[lng,lat],duration:700,essential:true}); return; }
   const rLon=Math.max(...pts.map(c=>Math.abs(c.lon-lng)));   // симметричная рамка вокруг кликнутого → он строго в центре
   const rLat=Math.max(...pts.map(c=>Math.abs(c.lat-lat)));
   const box=[[lng-rLon-.01,lat-rLat-.01],[lng+rLon+.01,lat+rLat+.01]];
-  const cam=map.cameraForBounds(box,{padding:40,maxZoom:13});
-  const z=Math.max(cam?cam.zoom:map.getZoom(), map.getZoom()+1);   // всегда приближаем минимум на 1 уровень (×2): после района клик по селу приближает его, не отдаляет
+  const cam=map.cameraForBounds(box,{padding:40,maxZoom:14});
+  const z=Math.max(cam?cam.zoom:map.getZoom(), map.getZoom());   // кадрируем ровно N НП (drill 8→3→1 даёт приближение), не отдаляя
   map.easeTo({center:[lng,lat], zoom:z, duration:700, essential:true});
+}
+// Прогрессивный drill по повторным кликам на ОДНО село: 1-й клик ~8 НП, 2-й — 3, 3-й — 1 (село по центру). Клик по другому селу / району — заново.
+let drillCode='', drillN=0; const DRILL_SEQ=[8,3,1];
+function drillVillage(lng, lat){
+  const nc=nearestCouncil(lng,lat).best, code=nc?nc.c:'_';
+  if(code===drillCode) drillN=Math.min(drillN+1, DRILL_SEQ.length-1); else { drillCode=code; drillN=0; }
+  fitNearestN(lng, lat, DRILL_SEQ[drillN]);
 }
 // Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
 map.on('click','lbl-place', e=>{
@@ -325,8 +332,8 @@ map.on('click','lbl-place', e=>{
     return;
   }
 
-  // city/town/village/hamlet — зум так, чтобы вокруг было ~6–8 НП (кликнутое в центре)
-  fitNearestN(lng, lat, 8);
+  // city/town/village/hamlet — прогрессивный drill (8 → 3 → 1) по повторным кликам
+  drillVillage(lng, lat);
 });
 // Наведение на НП → табличка форм собственности ближайшего совета (счётчики участков)
 const hoverPop = new maplibregl.Popup({ closeButton:false, closeOnClick:false, offset:12, maxWidth:'none', className:'rt-hover-pop' });
@@ -362,7 +369,7 @@ const clearHover=()=>{ map.getCanvas().style.cursor=''; hoverPop.remove(); };
 map.on('mouseleave','lbl-place', clearHover);
 map.on('mouseleave','lbl-councils', clearHover);
 // Клик по подписи совета (наш слой) → приближение к селу + соседним (как у lbl-place city/village)
-map.on('click','lbl-councils', e=>{ fitNearestN(e.lngLat.lng, e.lngLat.lat, 8); });
+map.on('click','lbl-councils', e=>{ drillVillage(e.lngLat.lng, e.lngLat.lat); });
 // Райцентры: события на прозрачной хитзоне centers-hit (зона больше подписи). Наведение → данные ВСЕГО района; клик → плавный зум во весь район.
 map.on('mouseenter','centers-hit', e=>{
   map.getCanvas().style.cursor='pointer';
@@ -372,6 +379,7 @@ map.on('mouseenter','centers-hit', e=>{
 map.on('mouseleave','centers-hit', clearHover);
 map.on('click','centers-hit', e=>{
   const f=e.features&&e.features[0]; if(!f) return;
+  drillCode='';   // клик по району сбрасывает прогрессию drill по сёлам (следующий клик по селу — снова с ~8)
   const co=f.geometry.coordinates, lng=co[0], lat=co[1];   // координаты самого центра (точнее точки клика в круге)
   const rname=RAION_BY_PREFIX[f.properties.rpfx]||'';
   const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):[]).filter(c=>c.lat&&c.lon);
