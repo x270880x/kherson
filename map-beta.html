@@ -322,8 +322,8 @@ map.on('click','lbl-place', e=>{
     return;
   }
 
-  // city/town/village/hamlet — зум так, чтобы вокруг было ~8–10 НП
-  fitNearestN(lng, lat, 10);
+  // city/town/village/hamlet — зум так, чтобы вокруг было ~6–8 НП (кликнутое в центре)
+  fitNearestN(lng, lat, 8);
 });
 // Наведение на НП → табличка форм собственности ближайшего совета (счётчики участков)
 const hoverPop = new maplibregl.Popup({ closeButton:false, closeOnClick:false, offset:12, maxWidth:'none', className:'rt-hover-pop' });
@@ -349,7 +349,7 @@ const clearHover=()=>{ map.getCanvas().style.cursor=''; hoverPop.remove(); };
 map.on('mouseleave','lbl-place', clearHover);
 map.on('mouseleave','lbl-councils', clearHover);
 // Клик по подписи совета (наш слой) → приближение к селу + соседним (как у lbl-place city/village)
-map.on('click','lbl-councils', e=>{ fitNearestN(e.lngLat.lng, e.lngLat.lat, 10); });
+map.on('click','lbl-councils', e=>{ fitNearestN(e.lngLat.lng, e.lngLat.lat, 8); });
 // Клик по подписи РАЙЦЕНТРА (наш слой центров) → плавный зум во ВЕСЬ район (медленно)
 map.on('click','lbl-centers', e=>{
   const f=e.features&&e.features[0]; if(!f) return;
