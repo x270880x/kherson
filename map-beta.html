@@ -195,7 +195,7 @@ function addCouncilLabels(){
     const g=byR[r], urb=g.filter(c=>isUrban(c.n)), pool=urb.length?urb:g;
     const best=pool.reduce((a,b)=>(+b.total||0)>(+a.total||0)?b:a); if(best) centers.add(best.c); }
   const LABEL_HIDE=new Set(['6523855000']);   // дубль-подпись «Нижние Серогозы — поля общины» рядом с самим смт — текст не выводим (участки остаются)
-  const feats=pts.filter(c=>!LABEL_HIDE.has(c.c)).map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n).replace(/^пгт\s+/i,''),total:c.total||0,ctr:centers.has(c.c),big:BIG_TOWNS.has(c.c),offLow:OFFLOW[c.c]}}));
+  const feats=pts.filter(c=>!LABEL_HIDE.has(c.c)).map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n).replace(/^пгт\s+/i,''),total:c.total||0,ctr:centers.has(c.c),big:BIG_TOWNS.has(c.c),offLow:OFFLOW[c.c],rpfx:c.c.slice(2,5)}}));
   // Херсон (~280k) отсутствует в данных как единый НП — добавляем вручную как центр (на обзоре виден)
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0],rpfx:'201'}});   //   — волосяной пробел (звезда ближе к слову)
   // Верхній Рогачик (центр Верхнерогачикского р-на) отсутствует в данных — добавляем вручную как центр
@@ -213,6 +213,9 @@ function addCouncilLabels(){
   map.addLayer({ id:'lbl-centers', type:'symbol', source:'councils', minzoom:7, filter:['any',['get','ctr'],['get','big']],
     layout:{ 'text-field':['get','name'], 'text-font':['Noto Sans Bold'], 'text-size':['interpolate',['linear'],['zoom'],8,['case',['==',['get','capital'],true],15.39,12.31],12,['case',['==',['get','capital'],true],19.44,15.55]], 'text-letter-spacing':['case',['==',['get','capital'],true],-0.02,0.06], 'text-offset':['step',['zoom'],['coalesce',['get','offLow'],['literal',[0,0]]],10,['literal',[0,0]]], 'text-max-width':8, 'symbol-sort-key':['-',['get','total']], 'text-allow-overlap':true },
     paint:{ 'text-color':'#10182b', 'text-halo-color':'#ffffff', 'text-halo-width':1.7 } }, 'lbl-place');
+  // прозрачная зона наведения/клика вокруг райцентров — больше самой подписи (особенно на обзоре), чтобы легче попадать мышкой
+  map.addLayer({ id:'centers-hit', type:'circle', source:'councils', minzoom:7, filter:['get','ctr'],
+    paint:{ 'circle-radius':['interpolate',['linear'],['zoom'],8,22,11,15,14,11], 'circle-color':'#000', 'circle-opacity':0 } });
   // (1) Приглушить OMT-подписи ВНЕ Херсонской области: оболочка советов → within (внутри opacity 1, снаружи 0.4)
   const hull={type:'Polygon',coordinates:[convexHull(pts.map(c=>[c.lon,c.lat]))]};
   // соседние НП, попадающие ВНУТРЬ выпуклой оболочки (реальная граница области вогнутая) — гасим принудительно
@@ -255,7 +258,7 @@ function popupHTML(rec, cname){
 let boxDragged=false;
 map.on('click', 'parcels-fill', async e => {
   if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
-  const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]).concat(map.getLayer('lbl-centers')?['lbl-centers']:[]);
+  const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]).concat(map.getLayer('lbl-centers')?['lbl-centers']:[]).concat(map.getLayer('centers-hit')?['centers-hit']:[]);
   if(map.queryRenderedFeatures(e.point,{layers:_lbls}).length) return;   // клик по названию НП (OMT / наш совет / центр) → зум, не плашка участка
   const visPlaces=map.queryRenderedFeatures({layers:['lbl-place']}).filter(f=>['city','town','village','hamlet'].includes(f.properties&&f.properties.class));
   if(visPlaces.length>10) return;   // слишком крупный план — участки не кликабельны
@@ -340,6 +343,19 @@ function ownTableHTML(c){
 }
 function nearestCouncil(lon,lat){ let best=null,bd=1e9; for(const c of CIDX){ const d=(c.lat-lat)**2+(c.lon-lon)**2; if(d<bd){bd=d;best=c;} } return {best,bd}; }
 function showHoverTable(ll){ if(!CIDX.length) return; const {best,bd}=nearestCouncil(ll[0],ll[1]); if(best && best.o && bd<0.04) hoverPop.setLngLat(ll).setHTML(ownTableHTML(best)).addTo(map); }   // в пределах ~22км (свои советы, не соседние области)
+// Агрегат по ВСЕМУ району (для наведения на райцентр)
+function raionTableHTML(rname){
+  const rc=CIDX.filter(c=>raionOf(c.c)===rname), cats=['p','k','g','n'], o={p:0,k:0,g:0,n:0}; let tot=0, ha=0;
+  for(const c of rc){ const co=c.o||{}; for(const k of cats) o[k]+=co[k]||0; tot+=c.total||0; ha+=c.ha||0; }
+  const nums=cats.map(k=>'<div style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:'+OWN[k][1]+';flex-shrink:0"></span><b style="font-family:ui-monospace,monospace;color:#e8e8ea;font-weight:600">'+o[k].toLocaleString('ru')+'</b></div>').join('');
+  return '<div style="font-size:11px;line-height:1.5;min-width:190px">'
+    +'<div style="color:#e8c547;font-weight:600">'+esc(rname)+'</div>'
+    +'<div style="color:#8b91a8;font-size:10px">'+rc.length+' НП · весь район</div>'
+    +'<div style="color:#cfd3df;font-family:ui-monospace,monospace;margin:3px 0 5px">'+tot.toLocaleString('ru')+' уч. · '+Math.round(ha).toLocaleString('ru')+' га</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:5px 13px">'+nums+'</div>'
+    +'</div>';
+}
+function showRaionTable(ll, rname){ if(!CIDX.length||!rname) return; hoverPop.setLngLat(ll).setHTML(raionTableHTML(rname)).addTo(map); }
 map.on('mouseenter','lbl-place', e=>{ map.getCanvas().style.cursor='pointer'; const f=e.features&&e.features[0]; if(f && ['city','town','village','hamlet'].includes(f.properties.class)) showHoverTable(f.geometry.coordinates); });
 map.on('mouseenter','lbl-councils', e=>{ map.getCanvas().style.cursor='pointer'; const f=e.features&&e.features[0]; if(f) showHoverTable(f.geometry.coordinates); });
 const clearHover=()=>{ map.getCanvas().style.cursor=''; hoverPop.remove(); };
@@ -347,29 +363,26 @@ map.on('mouseleave','lbl-place', clearHover);
 map.on('mouseleave','lbl-councils', clearHover);
 // Клик по подписи совета (наш слой) → приближение к селу + соседним (как у lbl-place city/village)
 map.on('click','lbl-councils', e=>{ fitNearestN(e.lngLat.lng, e.lngLat.lat, 8); });
-// Клик по подписи РАЙЦЕНТРА (наш слой центров) → плавный зум во ВЕСЬ район (медленно)
-map.on('click','lbl-centers', e=>{
+// Райцентры: события на прозрачной хитзоне centers-hit (зона больше подписи). Наведение → данные ВСЕГО района; клик → плавный зум во весь район.
+map.on('mouseenter','centers-hit', e=>{
+  map.getCanvas().style.cursor='pointer';
   const f=e.features&&e.features[0]; if(!f) return;
-  if(!f.properties.ctr) return;                 // крупный НП, но не центр → пусть обработает lbl-councils (зум в село)
-  const lat=e.lngLat.lat, lng=e.lngLat.lng;
-  if(CIDX.length){
-    let best=null,bd=1e9;
-    for(const c of CIDX){ if(!c.lat||!c.lon) continue; const d=(c.lat-lat)**2+(c.lon-lng)**2; if(d<bd){bd=d;best=c;} }
-    if(best){
-      const rname=(f.properties.rpfx&&RAION_BY_PREFIX[f.properties.rpfx])||raionOf(best.c);   // ручные центры несут rpfx (точный район); иначе — по ближайшему совету (для вычисленных центров best=сам совет)
-      const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):CIDX.filter(c=>c.c.slice(2,5)===best.c.slice(2,5))).filter(c=>c.lat&&c.lon);
-      if(rc.length){
-        const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг кликнутого центра → он строго по центру экрана, район целиком в кадре
-        const cam=map.cameraForBounds([[lng-rLon-.03,lat-rLat-.03],[lng+rLon+.03,lat+rLat+.03]],{padding:40});
-        map.easeTo({center:[lng,lat], zoom:cam?cam.zoom:9, duration:1600, essential:true});
-        return;
-      }
-    }
-  }
-  map.flyTo({center:e.lngLat,zoom:9,duration:1600,essential:true});
+  const rname=RAION_BY_PREFIX[f.properties.rpfx]; if(rname) showRaionTable(f.geometry.coordinates, rname);
 });
-map.on('mouseenter','lbl-centers', ()=>{ map.getCanvas().style.cursor='pointer'; });
-map.on('mouseleave','lbl-centers', ()=>{ map.getCanvas().style.cursor=''; });
+map.on('mouseleave','centers-hit', clearHover);
+map.on('click','centers-hit', e=>{
+  const f=e.features&&e.features[0]; if(!f) return;
+  const co=f.geometry.coordinates, lng=co[0], lat=co[1];   // координаты самого центра (точнее точки клика в круге)
+  const rname=RAION_BY_PREFIX[f.properties.rpfx]||'';
+  const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):[]).filter(c=>c.lat&&c.lon);
+  if(rc.length){
+    const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг центра → он строго по центру, район целиком
+    const cam=map.cameraForBounds([[lng-rLon-.03,lat-rLat-.03],[lng+rLon+.03,lat+rLat+.03]],{padding:40});
+    map.easeTo({center:[lng,lat], zoom:cam?cam.zoom:9, duration:1600, essential:true});
+    return;
+  }
+  map.flyTo({center:[lng,lat],zoom:9,duration:1600,essential:true});
+});
 
 // Переключатели форм собственности — показать/скрыть по ВСЕЙ карте (вкл. частные)
 const ownActive = new Set(['p','k','g','n']);
