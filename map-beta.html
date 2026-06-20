@@ -461,8 +461,8 @@ map.on('load', ()=>{
   map.addLayer({id:'fine-line',type:'line',source:'fine',paint:{'line-color':'#11141d','line-width':0.4}},'lbl-water');
   // размежёванные (РФ-кадастр) — розовая обводка + лёгкая заливка, видны на всех зумах (geojson-источник, без minzoom)
   map.addSource('razmezh',{type:'geojson',data: location.origin + location.pathname.replace(/[^/]*$/, '') + 'razmezh.geojson'});
-  map.addLayer({id:'razmezh-fill',type:'fill',source:'razmezh',paint:{'fill-color':'#ff2d9c','fill-opacity':['interpolate',['linear'],['zoom'],8,0.5,13,0.25]}},'lbl-water');
-  map.addLayer({id:'razmezh-line',type:'line',source:'razmezh',paint:{'line-color':'#ff2d9c','line-width':['interpolate',['linear'],['zoom'],8,1.4,12,2,16,3]}},'lbl-water');
+  map.addLayer({id:'razmezh-fill',type:'fill',source:'razmezh',paint:{'fill-color':'#c050ff','fill-opacity':['interpolate',['linear'],['zoom'],8,0.35,13,0]}},'lbl-water');
+  map.addLayer({id:'razmezh-line',type:'line',source:'razmezh',paint:{'line-color':'#c050ff','line-width':2.5}},'lbl-water');
   // подборка — поверх всего
   map.addSource('basket',{type:'geojson',data:EMPTY});
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
