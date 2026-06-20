@@ -219,9 +219,6 @@ function addCouncilLabels(){
   const OUT_OF_REGION=['Армянск','Армянськ','Красноперекопск','Красноперекопськ'];
   const nm=['coalesce',['get','name:ru'],['get','name:latin'],['get','name']];
   map.setPaintProperty('lbl-place','text-opacity',['case',['in',nm,['literal',OUT_OF_REGION]],0.4,['within',hull],1,0.4]);
-  // тусклые подписи НП других областей (вне hull / OUT_OF_REGION) — на 30% меньше (×0.7); херсонские — полный размер
-  const SZ_FULL=['interpolate',['exponential',1.2],['zoom'],6,13.2,11,18], SZ_DIM=['interpolate',['exponential',1.2],['zoom'],6,9.24,11,12.6];
-  try{ map.setLayoutProperty('lbl-place','text-size',['case',['in',nm,['literal',OUT_OF_REGION]],SZ_DIM,['within',hull],SZ_FULL,SZ_DIM]); }catch(e){ console.warn('lbl-place text-size dim failed',e); }
   // (2) Убрать ДУБЛИ: вырезаем из OMT lbl-place названия, которые рисуем сами (центры/советы) — по name:ru, не по позиции
   const bareRu=n=>{ const m=(n||'').match(/\(([^)]+)\)\s*$/); return m?m[1].trim():(n||''); };
   const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон','Верхний Рогачик','Верхній Рогачик','Новая Збурьевка','Нова Збурьевка','Великая Александровка','Велика Олександрівка','Нововоронцовка','Нововоронцівка'])];   // + ручной hide чужих OMT-сёл внутри области
@@ -454,16 +451,23 @@ function addParcels(){
 // Участки добавляем на самом раннем готовом стиле, НЕ дожидаясь медленного внешнего слоя подписей omt (из-за которого они раньше появлялись только при зуме).
 // styledata срабатывает как только стиль разобран; addParcels идемпотентен и retry-safe, вызов в load ниже — страховка.
 map.on('styledata', addParcels);
+// Размежёванные (РФ-кадастр): розовая/фиолетовая обводка. Тот же ранний триггер, что у участков — НЕ в load (иначе при медленном OMT слой не появлялся).
+let razmezhAdded=false;
+function addRazmezh(){
+  if(razmezhAdded || !map.getLayer('lbl-water')) return;   // ждём готовый стиль (есть базовый слой)
+  if(!map.getSource('razmezh')) map.addSource('razmezh',{type:'geojson',data: location.origin + location.pathname.replace(/[^/]*$/, '') + 'razmezh.geojson'});
+  map.addLayer({id:'razmezh-fill',type:'fill',source:'razmezh',paint:{'fill-color':'#c050ff','fill-opacity':['interpolate',['linear'],['zoom'],8,0.35,13,0]}},'lbl-water');
+  map.addLayer({id:'razmezh-line',type:'line',source:'razmezh',paint:{'line-color':'#c050ff','line-width':2.5}},'lbl-water');
+  razmezhAdded=true;   // флаг только после успешного addLayer
+}
+map.on('styledata', addRazmezh);
 map.on('load', ()=>{
   addParcels();   // детерминированно: участки добавляются сразу после первого кадра подложки (без зависимости от idle/таймеров)
+  addRazmezh();   // страховка
   // оверлей отфильтрованных участков (гибрид: подгрузка по зуму)
   map.addSource('fine',{type:'geojson',data:EMPTY});
   map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.62,'fill-antialias':false}},'lbl-water');
   map.addLayer({id:'fine-line',type:'line',source:'fine',paint:{'line-color':'#11141d','line-width':0.4}},'lbl-water');
-  // размежёванные (РФ-кадастр) — розовая обводка + лёгкая заливка, видны на всех зумах (geojson-источник, без minzoom)
-  map.addSource('razmezh',{type:'geojson',data: location.origin + location.pathname.replace(/[^/]*$/, '') + 'razmezh.geojson'});
-  map.addLayer({id:'razmezh-fill',type:'fill',source:'razmezh',paint:{'fill-color':'#c050ff','fill-opacity':['interpolate',['linear'],['zoom'],8,0.35,13,0]}},'lbl-water');
-  map.addLayer({id:'razmezh-line',type:'line',source:'razmezh',paint:{'line-color':'#c050ff','line-width':2.5}},'lbl-water');
   // подборка — поверх всего
   map.addSource('basket',{type:'geojson',data:EMPTY});
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
