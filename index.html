@@ -687,11 +687,14 @@ function togglePolygons() {
     if (polygonsVisible) l.addTo(map); else map.removeLayer(l);
   });
 }
-// Базовые слои
-const baseDark = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// Базовые слои.  OSM (со своими подписями) — обычный режим; CARTO *nolabels* — в режиме подписей НП «Вся карта» (как на бете)
+const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const CARTO_DARK_NL = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
+const CARTO_LIGHT_NL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png';
+const baseDark = L.tileLayer(OSM_URL, {
   maxZoom: 19, attribution: '© OpenStreetMap', className: 'map-tiles map-tiles-dark',
 });
-const baseLight = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const baseLight = L.tileLayer(OSM_URL, {
   maxZoom: 19, attribution: '© OpenStreetMap',
 });
 const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -699,10 +702,18 @@ const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/service
 });
 baseDark.addTo(map);
 
-// Dark filter только для baseDark
+// Dark filter только для baseDark (OSM); в режиме подписей подложка — CARTO nolabels, инверт выключаем
 const style = document.createElement('style');
-style.textContent = '.map-tiles-dark { filter: invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.7); }';
+style.textContent = '.map-tiles-dark { filter: invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.7); }'
+  + ' #map.labels-basemap .map-tiles-dark { filter: none !important; }';
 document.head.appendChild(style);
+// В «Вся карта» (labelsActive) подложка без подписей — наши подписи НП не дублируются OSM-подписями; в «По сёлам» возвращаем OSM (контекст соседних городов/рек)
+function applyBasemapLabels() {
+  const noLabels = labelsActive();
+  baseDark.setUrl(noLabels ? CARTO_DARK_NL : OSM_URL);
+  baseLight.setUrl(noLabels ? CARTO_LIGHT_NL : OSM_URL);
+  map.getContainer().classList.toggle('labels-basemap', noLabels);
+}
 
 const fullMapLayer = L.layerGroup();   // фиктивный слой-тумблер режима «Полная карта»
 const layersCtrl = L.control.layers({
@@ -953,11 +964,13 @@ function enableFullMap() {
   activePolyCode = null;
   syncParcelTiles();
   labelsUpdate();
+  applyBasemapLabels();
 }
 function disableFullMap() {
   fullMapMode = false;
   syncParcelTiles();   // убрать тайлы только если не активна «Вся карта»
   labelsUpdate();      // подписи останутся, если активна «Вся карта»; иначе очистятся
+  applyBasemapLabels();
   if (!labelsActive() && !map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки
 }
 map.on('overlayadd', e => { if (e.layer === fullMapLayer) enableFullMap(); });
@@ -1135,6 +1148,7 @@ function setOwnMode(mode) {
     if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки-маркеры
     buildMarkers();
   }
+  applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
   applyOwnModeUI();
 }
 
