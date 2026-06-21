@@ -954,6 +954,7 @@ async function showOwnRegion(ot) {
         style: { color: ownColor(ot), weight: 0.6, fillColor: ownColor(ot), fillOpacity: 0.5 }
       });
       lyr.on('click', e => {        // делегирование на весь слой (без обработчиков на каждом из десятков тысяч участков)
+        if (map.getZoom() < 12.5) return;   // ниже z12.5 — только статичный приблизительный цвет; на сами полигоны (клик/детали) переключаемся с z12.5
         const l = e.layer, f = l.feature, cad = f.properties.cadnum;
         if (e.originalEvent && e.originalEvent.shiftKey) { basketToggle(cad); L.DomEvent.stopPropagation(e); return; }
         const council = COUNCILS.find(c => c.code === cad.slice(0, 10));
