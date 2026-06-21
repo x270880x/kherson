@@ -29,7 +29,7 @@
     --border: #2a2f42;
     --accent: #e8c547;
     --red: #e11d1d;
-    --green: #4caf7d;
+    --green: #2ecc71;
     --blue: #4a9eff;
     --orange: #e8a547;
     --text: #d8dce8;
@@ -400,7 +400,7 @@ const ruOwn = s => OWNERSHIP_RU[s] || s;
 
 // Цвета форм собственности — те же, что у участков на карте
 const OWN_COLOR = {
-  'Приватна власність': '#4caf7d',
+  'Приватна власність': '#2ecc71',
   'Комунальна власність': '#e8c547',
   'Державна власність': '#4a9eff',
   'Не визначено': '#e11d1d'
@@ -645,7 +645,7 @@ function fallbackCopy(text, ok) {
 function copyCad(btn, text) {
   const restore = btn.innerHTML;
   const ok = () => {
-    btn.innerHTML = '✓'; btn.style.color = '#4caf7d'; btn.style.borderColor = '#4caf7d';
+    btn.innerHTML = '✓'; btn.style.color = '#2ecc71'; btn.style.borderColor = '#2ecc71';
     setTimeout(() => { btn.innerHTML = restore; btn.style.color = '#bbb'; btn.style.borderColor = 'rgba(255,255,255,0.25)'; }, 1100);
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -730,13 +730,15 @@ const LABEL_MIN_ZOOM = 11;              // подписи сёл — от это
 const LABEL_MAX_COUNCILS = 60;          // если в кадре больше — подписи прячем (мусор)
 let parcelTilesAll = null;          // «Полная карта»: один слой всех форм (эффективно)
 const parcelLayers = {};            // «Вся карта»: по слою на форму — выключение одной не трогает остальные
-const TILE_OWN_COLOR = { p: '#4caf7d', k: '#e8c547', g: '#4a9eff', n: '#e11d1d' };  // = ownColor
+const TILE_OWN_COLOR = { p: '#2ecc71', k: '#e8c547', g: '#4a9eff', n: '#e11d1d' };  // = ownColor
 const OT_SHORT = { 'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n' };
 const allMapVisible = new Set(['p','k','g','n']);   // формы, видимые в режиме «Вся карта» (по умолчанию все, вкл. частную)
 const TILE_VG_OPTS = { rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 19, maxNativeZoom: 14 };
-function fillOp() {   // яркость заливки по зуму: обзор 0.95 → с z11 0.6 (обновляется при отрисовке новых тайлов при смене зума)
+function fillOp() {   // яркость заливки по зуму: z≤9 → 0.90, z10 → 0.65, z11+ → 0.50 (обновляется при отрисовке тайлов на смене зума)
   const z = map.getZoom();
-  return z <= 9 ? 0.95 : z >= 11 ? 0.6 : 0.95 - (z - 9) / 2 * 0.35;
+  if (z <= 9) return 0.90;
+  if (z >= 11) return 0.50;
+  return z <= 10 ? 0.90 - (z - 9) * 0.25 : 0.65 - (z - 10) * 0.15;
 }
 function tileStyle(props, only) {   // only=undefined → красить все формы; only='p' → только эту форму
   if (only && props.o !== only) return [];

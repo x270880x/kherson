@@ -53,7 +53,7 @@
   <div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:2px 0 3px">554 130 уч · 1 975 487 га · 336 сёл · 20 р-нов · 2 412 разм.</div>
   <div style="margin:4px 0"><button class="bt" data-b="light">Светлая</button><button class="bt on" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
   <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
-  <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#4caf7d"></span>Частная</label>
+  <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#2ecc71"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
   <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
   <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#e11d1d"></span>Не определено</label>
@@ -75,7 +75,7 @@
 <div id="basket">📌 <b id="bk-count">0</b> уч. <button id="bk-exp">CSV</button><button id="bk-clr">Очистить</button></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-const OWN = { p:['Частная','#4caf7d'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e11d1d'] };
+const OWN = { p:['Частная','#2ecc71'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e11d1d'] };
 // Границы всей Херсонской области (по экстенту 337 советов + небольшой запас) — стартовый кадр на весь экран
 const KHERSON_BOUNDS = [[31.80, 45.90], [35.10, 47.45]];   // [[з,ю],[в,с]]
 const map = new maplibregl.Map({
@@ -254,11 +254,11 @@ const raionOf=code=>RAION_BY_PREFIX[(code||'').slice(2,5)]||'';
 let CAT_RU={};   // перевод «Назначение» укр→рус (фильтр — укр, попап — рус)
 fetch(BASE+'categories-ru.json').then(r=>r.json()).then(d=>{CAT_RU=d;}).catch(()=>{});
 const catRu=ct=>CAT_RU[ct]||ct||'';
-const OTC={'Приватна власність':['Частная собственность','#4caf7d'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#e11d1d']};
+const OTC={'Приватна власність':['Частная собственность','#2ecc71'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#e11d1d']};
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 // Копирование кадастрового номера из попапа (как на основной карте)
 function fallbackCopy(text, ok){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); ok(); }catch(e){} document.body.removeChild(ta); }
-function copyCad(btn, text){ const restore=btn.innerHTML; const ok=()=>{ btn.innerHTML='✓'; btn.style.color='#4caf7d'; btn.style.borderColor='#4caf7d'; setTimeout(()=>{ btn.innerHTML=restore; btn.style.color='#bbb'; btn.style.borderColor='rgba(255,255,255,0.25)'; },1100); }; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(()=>fallbackCopy(text,ok)); } else fallbackCopy(text,ok); }
+function copyCad(btn, text){ const restore=btn.innerHTML; const ok=()=>{ btn.innerHTML='✓'; btn.style.color='#2ecc71'; btn.style.borderColor='#2ecc71'; setTimeout(()=>{ btn.innerHTML=restore; btn.style.color='#bbb'; btn.style.borderColor='rgba(255,255,255,0.25)'; },1100); }; if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok).catch(()=>fallbackCopy(text,ok)); } else fallbackCopy(text,ok); }
 const copyBtn=(text,title)=>'<button onclick="copyCad(this,\''+text+'\')" title="'+title+'" aria-label="'+title+'" style="display:inline-flex;align-items:center;background:none;border:1px solid rgba(255,255,255,0.25);border-radius:3px;color:#bbb;cursor:pointer;padding:2px 5px;line-height:1;flex-shrink:0;vertical-align:middle"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>';
 function popupHTML(rec, cname){
   const ot=OTC[rec.ot]||['—','#888']; let h='<div style="font-size:12px;line-height:1.5;max-width:300px;color:#e8e8ea">';
@@ -470,7 +470,7 @@ function basketToggle(cad, geom, rec, cname){
   if(basket.has(cad)) basket.delete(cad); else basket.set(cad,{geom,rec,cname});
   basketRefresh();
 }
-const OWN_COLOR_EXPR=['match',['get','o'],'p','#4caf7d','k','#e8c547','g','#4a9eff','n','#e11d1d','#888888'];
+const OWN_COLOR_EXPR=['match',['get','o'],'p','#2ecc71','k','#e8c547','g','#4a9eff','n','#e11d1d','#888888'];
 const EMPTY={type:'FeatureCollection',features:[]};
 // Слой участков добавляем отложенно — подложка успевает прорисоваться, тяжёлые .pbf не блокируют первый кадр
 let parcelsAdded=false;
@@ -478,7 +478,7 @@ function addParcels(){
   if(parcelsAdded || !map.getSource('parcels') || !map.getLayer('lbl-water')) return;   // ждём, пока стиль готов (есть базовый слой)
   const before = 'lbl-water';   // под подписями; fine/basket добавятся выше
   map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
-    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':['interpolate',['linear'],['zoom'],9,0.95,11,0.6], 'fill-antialias':false } }, before);
+    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':['interpolate',['linear'],['zoom'],9,0.9,10,0.65,11,0.5], 'fill-antialias':false } }, before);
   // Обводка КАЖДОГО участка — чтобы соседние одного цвета не сливались (как на источнике).
   // Толщина растёт с зумом; видна уже с z12.5 (тонко), к z16+ — чёткая граница.
   map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:12.5,
@@ -506,7 +506,7 @@ map.on('load', ()=>{
   addRazmezh();   // страховка
   // оверлей отфильтрованных участков (гибрид: подгрузка по зуму)
   map.addSource('fine',{type:'geojson',data:EMPTY});
-  map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.6,'fill-antialias':false}},'lbl-water');
+  map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.5,'fill-antialias':false}},'lbl-water');
   map.addLayer({id:'fine-line',type:'line',source:'fine',paint:{'line-color':'#0c0f17','line-width':['interpolate',['linear'],['zoom'], 12.5,0.4, 14,0.8, 16,1.5, 18,2.3]}},'lbl-water');
   // подборка — поверх всего
   map.addSource('basket',{type:'geojson',data:EMPTY});
