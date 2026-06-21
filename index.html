@@ -481,7 +481,7 @@ function detailTitle(c) {
 const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
 const _qs = new URLSearchParams(location.search);
 const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или ?zoom=8.5 — зум; при наличии сразу открываем «Вся карта»
-const ALL_ZOOM = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : 8.0;
+const ALL_ZOOM = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : 9.0;   // дефолтный зум открытия «Вся карта» (без ?zoom=)
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
