@@ -765,10 +765,11 @@ function syncParcelTiles() {        // добавляем/убираем сло�
 }
 
 const isTownC = c => TOWN_LABEL_RE.test(ruName(c.name));
+const labelText = c => ruName(c.name).replace(/^пгт\s+/i, '');   // «пгт» убираем только с подписи карты (как в бете)
 function makeLabel(c) {
   const rn = ruName(c.name);
   const tip = L.tooltip({ permanent: true, direction: 'center', className: 'council-label' + (isTownC(c) ? ' town' : ''), interactive: true })
-    .setLatLng([c.lat, c.lon]).setContent(escapeHtml(rn));
+    .setLatLng([c.lat, c.lon]).setContent(escapeHtml(labelText(c)));
   tip.addTo(map);
   const el = tip.getElement();
   if (el) {
@@ -799,7 +800,7 @@ function labelsUpdate() {
     const town = isTownC(c);
     if (!town && z < VILLAGE_LABEL_ZOOM) continue;   // сёла — только с ближнего зума
     const p = map.latLngToContainerPoint([c.lat, c.lon]);
-    const rn = ruName(c.name);
+    const rn = labelText(c);
     const w = rn.length * (town ? 7.4 : 6.3) + 14, h = town ? 22 : 18;
     const box = [p.x - w / 2, p.y - h / 2, p.x + w / 2, p.y + h / 2];
     if (placed.some(q => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) continue;  // наложение → пропуск

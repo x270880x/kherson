@@ -478,7 +478,7 @@ function addParcels(){
   if(parcelsAdded || !map.getSource('parcels') || !map.getLayer('lbl-water')) return;   // ждём, пока стиль готов (есть базовый слой)
   const before = 'lbl-water';   // под подписями; fine/basket добавятся выше
   map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
-    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':['interpolate',['linear'],['zoom'],9,0.8,10,0.65,11,0.5], 'fill-antialias':false } }, before);
+    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':['interpolate',['linear'],['zoom'],9,0.6,11,0.5], 'fill-antialias':false } }, before);
   // Обводка КАЖДОГО участка — чтобы соседние одного цвета не сливались (как на источнике).
   // Толщина растёт с зумом; видна уже с z12.5 (тонко), к z16+ — чёткая граница.
   map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:12.5,
