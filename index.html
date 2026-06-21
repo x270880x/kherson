@@ -1138,7 +1138,7 @@ function setOwnMode(mode) {
     if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);   // вместо кружков — подписи названий (как в бете)
     syncParcelTiles();    // + лёгкие векторные тайлы (по слою на форму; клик по участку с z12.5)
     const pts = COUNCILS.filter(c => c.lat).map(c => [c.lat, c.lon]);
-    if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [40, 40], duration: 0.6 });  // показать всю область
+    if (pts.length) map.flyTo(L.latLngBounds(pts).getCenter(), 8.0, { duration: 0.6 });  // показать область, зум 8.0
     labelsUpdate();
   } else {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
