@@ -277,8 +277,7 @@ map.on('click', 'parcels-fill', async e => {
   if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
   const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]).concat(map.getLayer('lbl-centers')?['lbl-centers']:[]).concat(map.getLayer('centers-hit')?['centers-hit']:[]);
   if(map.queryRenderedFeatures(e.point,{layers:_lbls}).length) return;   // клик по названию НП (OMT / наш совет / центр) → зум, не плашка участка
-  const visPlaces=map.queryRenderedFeatures({layers:['lbl-place']}).filter(f=>['city','town','village','hamlet'].includes(f.properties&&f.properties.class));
-  if(visPlaces.length>10) return;   // слишком крупный план — участки не кликабельны
+  if(map.getZoom()<12.5) return;   // ниже z12.5 — только статичный приблизительный цвет; на сами полигоны (клик/детали) переключаемся с z12.5
   const x=e.lngLat.lng, y=e.lngLat.lat, shift=e.originalEvent && e.originalEvent.shiftKey;
   const popup = shift ? null : new maplibregl.Popup({maxWidth:'320px'}).setLngLat(e.lngLat).setHTML('<span style="font-size:12px;color:#8b91a8">загрузка…</span>').addTo(map);
   const near=CIDX.filter(c=>Math.abs(c.lat-y)<0.25&&Math.abs(c.lon-x)<0.3).sort((a,b)=>((a.lat-y)**2+(a.lon-x)**2)-((b.lat-y)**2+(b.lon-x)**2)).slice(0,4);
@@ -317,12 +316,14 @@ function fitNearestN(lng, lat, n){
   const z=Math.max(cam?cam.zoom:map.getZoom(), map.getZoom());   // кадрируем ровно N НП (drill 8→3→1 даёт приближение), не отдаляя
   map.easeTo({center:[lng,lat], zoom:z, duration:700, essential:true});
 }
-// Прогрессивный drill по повторным кликам на ОДНО село: 1-й клик ~8 НП, 2-й — 3, 3-й — 1 (село по центру). Клик по другому селу / району — заново.
-let drillCode='', drillN=0; const DRILL_SEQ=[4,2,1];   // клик по селу → видно ~4 села; повторный клик ближе (2 → 1)
+// Прогрессивный drill по повторным кликам на ОДНО село: 1-й клик ~4 НП, 2-й — фикс zoom 12.5, 3-й — 1 (село по центру). Клик по другому селу / району — заново.
+let drillCode='', drillN=0; const DRILL_STEPS=[{n:4},{z:12.5},{n:1}];   // шаг: {n:кадр N сёл} или {z:фикс. зум}
 function drillVillage(lng, lat){
   const nc=nearestCouncil(lng,lat).best, code=nc?nc.c:'_';
-  if(code===drillCode) drillN=Math.min(drillN+1, DRILL_SEQ.length-1); else { drillCode=code; drillN=0; }
-  fitNearestN(lng, lat, DRILL_SEQ[drillN]);
+  if(code===drillCode) drillN=Math.min(drillN+1, DRILL_STEPS.length-1); else { drillCode=code; drillN=0; }
+  const step=DRILL_STEPS[drillN];
+  if(step.z!=null) map.easeTo({center:[lng,lat], zoom:step.z, duration:700, essential:true});
+  else fitNearestN(lng, lat, step.n);
 }
 // Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
 map.on('click','lbl-place', e=>{
