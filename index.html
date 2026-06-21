@@ -730,6 +730,17 @@ const LABEL_MIN_ZOOM = 11;              // подписи сёл — от это
 const LABEL_MAX_COUNCILS = 60;          // если в кадре больше — подписи прячем (мусор)
 let parcelTiles = null;
 const TILE_OWN_COLOR = { p: '#4caf7d', k: '#e8c547', g: '#4a9eff', n: '#e05252' };  // = ownColor
+const OT_SHORT = { 'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n' };
+const allMapVisible = new Set(['p','k','g','n']);   // формы, видимые в режиме «Вся карта» (по умолчанию все, вкл. частную)
+function syncParcelTiles() {   // тайлы участков видны в «Полная карта» ИЛИ «Вся карта»
+  if (fullMapMode || ownMode === 'all') ensureParcelTiles().addTo(map);
+  else if (parcelTiles && map.hasLayer(parcelTiles)) map.removeLayer(parcelTiles);
+}
+function refreshParcelTiles() {   // пересоздать слой тайлов, чтобы применить новый стиль (фильтр форм)
+  if (parcelTiles && map.hasLayer(parcelTiles)) map.removeLayer(parcelTiles);
+  parcelTiles = null;
+  syncParcelTiles();
+}
 
 function fmAddLabel(c) {
   if (fullMapLabelByCode[c.code] || !c.lat) return;
@@ -762,10 +773,10 @@ function ensureParcelTiles() {
     interactive: false,                 // клики обрабатываем сами (canvas-тайлы нельзя кликать по объектам надёжно)
     minZoom: 8, maxZoom: 19, maxNativeZoom: 14,   // выше 14 — доращивание (overzoom), вектор остаётся чётким
     vectorTileLayerStyles: {
-      parcels: (props) => ({
-        weight: 0.35, color: '#1a1a1a', opacity: 0.85,
-        fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: 0.55
-      })
+      parcels: (props) => {
+        if (ownMode === 'all' && !allMapVisible.has(props.o)) return { fill: false, stroke: false };   // в «Вся карта» прятать невыбранные формы
+        return { weight: 0.35, color: '#1a1a1a', opacity: 0.85, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: 0.55 };
+      }
     }
   });
   return parcelTiles;
@@ -794,7 +805,8 @@ async function rawParcels(code) {
   return rawParcelsCache[code];
 }
 map.on('click', async e => {
-  if (!fullMapMode) return;
+  if (!fullMapMode && ownMode !== 'all') return;
+  if (ownMode === 'all' && map.getZoom() < 12.5) return;   // «Вся карта»: клик по участку только с z12.5 (ниже — статичный цветной слой)
   const x = e.latlng.lng, y = e.latlng.lat;
   const near = COUNCILS.filter(c => c.lat && Math.abs(c.lat - y) < 0.25 && Math.abs(c.lon - x) < 0.3)
     .sort((a, b) => ((a.lat - y) ** 2 + (a.lon - x) ** 2) - ((b.lat - y) ** 2 + (b.lon - x) ** 2)).slice(0, 4);
@@ -821,7 +833,7 @@ function enableFullMap() {
 }
 function disableFullMap() {
   fullMapMode = false;
-  if (parcelTiles && map.hasLayer(parcelTiles)) map.removeLayer(parcelTiles);
+  syncParcelTiles();   // убрать тайлы только если не активна «Вся карта»
   fmLabelsClear();
   if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);               // вернуть маркеры
 }
@@ -972,7 +984,7 @@ function hideOwnRegion(ot) {
 function applyOwnModeUI() {
   document.querySelectorAll('#own-mode button').forEach(b => b.classList.toggle('on', b.dataset.mode === ownMode));
   document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => {
-    const dim = (ownMode === 'all' && cb.value === OWN_PRIVATE);   // в режиме «вся карта» частная замучена и некликабельна
+    const dim = false;   // «Вся карта» теперь показывает все формы, включая частную (через тайлы)
     cb.disabled = dim;
     const lbl = cb.closest('label');
     if (lbl) { lbl.style.opacity = dim ? '0.35' : ''; lbl.style.pointerEvents = dim ? 'none' : ''; }
@@ -981,16 +993,20 @@ function applyOwnModeUI() {
 function setOwnMode(mode) {
   if (mode === ownMode) return;
   ownMode = mode;
-  document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
   filterOwnership = new Set();
   if (mode === 'all') {
+    allMapVisible.clear(); ['p','k','g','n'].forEach(s => allMapVisible.add(s));   // со старта все формы (вкл. частную)
+    document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = true);
     for (const c in polygonLayers) if (map.hasLayer(polygonLayers[c])) map.removeLayer(polygonLayers[c]);  // убрать полигоны открытых сёл
     activePolyCode = null;
-    buildMarkers();
+    buildMarkers();          // маркеры советов остаются (имена/навигация)
+    refreshParcelTiles();    // + лёгкие векторные тайлы всех форм (статичный цвет; клик по участку с z12.5)
     const pts = COUNCILS.filter(c => c.lat).map(c => [c.lat, c.lon]);
     if (pts.length) map.flyToBounds(L.latLngBounds(pts), { padding: [40, 40], duration: 0.6 });  // показать всю область
   } else {
-    for (const ot in ownRegionLayers) hideOwnRegion(ot);   // убрать региональные слои
+    document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
+    for (const ot in ownRegionLayers) hideOwnRegion(ot);   // убрать региональные слои (легаси own_*)
+    syncParcelTiles();       // убрать тайлы (если не активна «Полная карта»)
     buildMarkers();
   }
   applyOwnModeUI();
@@ -1421,8 +1437,10 @@ function renderSidebar() {
   `).join('');
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
     cb.addEventListener('change', () => {
-      if (ownMode === 'all') {        // режим «вся карта»: галка = показать/скрыть участки этой формы по всей области
-        if (cb.checked) showOwnRegion(cb.value); else hideOwnRegion(cb.value);
+      if (ownMode === 'all') {        // режим «вся карта»: галка = показать/скрыть форму на тайлах
+        const s = OT_SHORT[cb.value];
+        if (cb.checked) allMapVisible.add(s); else allMapVisible.delete(s);
+        refreshParcelTiles();
         return;
       }
       filterOwnership = new Set(
