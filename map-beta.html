@@ -122,8 +122,14 @@ document.getElementById('zout').onclick = () => zoomStep(-0.35);
 const zoutBtn = document.getElementById('zout');
 function updateZoutBtn(){ const dis=map.getZoom()<=map.getMinZoom()+0.05; zoutBtn.style.opacity=dis?'.3':''; zoutBtn.style.pointerEvents=dis?'none':''; }
 map.on('zoom', updateZoutBtn);
-// Блокировка пана на стартовом зуме: тащить карту нельзя, пока не приблизишь (клик по селу/поиск приближают ПРОГРАММНО — работают всегда)
-function applyPanLock(){ if(map.getZoom() <= map.getMinZoom()+0.05) map.dragPan.disable(); else map.dragPan.enable(); }
+// Пан заблокирован на старте + 2 отдалениях (тащить нельзя, пока не приблизишь). При зуме-ин — пан только в пределах области (+~1см). Клик/поиск приближают программно — работают всегда.
+let START_ZOOM = null;
+const PAN_BOUNDS = [[31.48, 45.72], [35.15, 47.65]];   // края парцел Херсонщины +~0.05° = «до краёв области +1см, не дальше»
+function applyPanLock(){
+  if(START_ZOOM == null) return;
+  if(map.getZoom() <= START_ZOOM + 0.05){ map.dragPan.disable(); map.setMaxBounds(null); }   // старт/отдалено — пан выкл, зум-аут до minZoom разрешён
+  else { map.dragPan.enable(); map.setMaxBounds(PAN_BOUNDS); }                                // приблизили — пан вкл, но строго в рамке области
+}
 map.on('zoomend', applyPanLock);
 
 // ── Титул региона: герб + «Херсонская область» — фиксированный оверлей по центру канваса ──
@@ -509,8 +515,9 @@ map.on('load', ()=>{
     if(!cam || !isFinite(cam.zoom)) return;   // контейнер ещё не разложен — повторим по таймеру
     started=true;
     const fz = cam.zoom;                       // «вся область в кадре»
-    map.setMinZoom(fz - 1);                     // нижний предел = на 2 пункта ниже старта
-    map.jumpTo({ center: cam.center, zoom: fz + 1 });   // стартовый кадр — на 1 пункт ближе
+    START_ZOOM = fz + 1;                          // старт — на 1 пункт ближе обзора (вся область в кадре)
+    map.setMinZoom(START_ZOOM - 0.70);            // зум-аут максимум 2 нажатия минуса (шаг 0.35), дальше блок
+    map.jumpTo({ center: cam.center, zoom: START_ZOOM });
     // подписи сёл — только при приближении (выше старта), на обзоре остаются лишь райцентры
     if(map.getLayer('lbl-councils')) map.setLayoutProperty('lbl-councils','minzoom', fz + 1.6);
     updateZoutBtn(); applyPanLock();

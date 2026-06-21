@@ -58,7 +58,7 @@
 - **Слои «Вся карта» по собственности:** `ownMode` (~833), `OWN_FILE = {Державна:'own_gos', Комунальна:'own_kom', Не визначено:'own_nedef'}`, `showOwnRegion` (~940), переключатель `#own-mode` («По сёлам»/«Вся карта»). Частная заблокирована в «Вся карта».
 - **Подборка (basket):** `basket = new Set()` (~1476), `renderBasketPanel()` (~1479), рамочное выделение `setupBoxSelect` (~1554), сброс `btn-basket-clear`. Кадастр в списке красится `ownColor(r.ot)`.
 - **Плашка участка:** `buildParcelPopup` — УКР-кадастр + РФ-номер (`mz`) с кнопками копирования.
-- **Названия:** `nameParts`/`ruName`/`detailTitle`. **22 совета вручную переименованы** (рус в скобках с перечислением сёл) — искались по «зависшим» агрегат-зонам, привязка через Nominatim + сверка с укр. Wikipedia / decentralization.gov.ua.
+- **Названия:** `nameParts`/`ruName`/`detailTitle`. Имена советов — в `councils-index.json` `n` («укр (рус)»); в файлах советов имена «сырые». **Эталон имён — Яндекс.Карты (РФ-наименования «на сейчас»).** 2026-06-21 выровнено **~93 совета** (reverse/forward-геокод жилого кластера 02.01 + КОАТУУ-код рады = её центр + web decentralization/Вікіпедія); 276 совпали с Яндексом сразу. **vkursi имён НП не даёт** (`np`/`ra` пустые). Ключ Яндекс-геокодера — `~/.yandex_geocoder_token` (600), тулинг `.wip/refetch/yandex_audit.py`+`pos_align.py`. Менять имена/двигать полигоны — только с подтверждением пользователя.
 - **Мобайл (≤768px):** карта на весь экран; фильтры — шторка `aside.left.open` по `#mobile-filters-btn` (☰); правая `aside.right` при выборе села не открывается; зум +/− скрыт.
 
 ## `map-beta.html` — бета-карта (MapLibre GL JS 4.7.1)
@@ -67,9 +67,10 @@ GPU-рендер всех участков из `tiles/` (цвет по `o`; `fi
 ### Стартовый вид
 - `KHERSON_BOUNDS = [[31.80,45.90],[35.10,47.45]]` (запас под края уже в bounds).
 - Конструктор: `bounds: KHERSON_BOUNDS`, `fitBoundsOptions:{padding:0}` (область до краёв кадра), `minZoom:6`, `maxZoom:19`, `fadeDuration:0`.
-- `setupStart()` (по `idle` + таймеры 300/800мс, идемпотентно): `fz = cameraForBounds(KHERSON_BOUNDS,{padding:0}).zoom`; `setMinZoom(fz-1)` (разрешено отдалить на **2 уровня** от старта, дальше блок); `jumpTo({zoom: fz+1})` — стартовый кадр на 1 пункт ближе обзора.
+- `setupStart()` (по `idle` + таймеры 300/800мс, идемпотентно): `fz = cameraForBounds(KHERSON_BOUNDS,{padding:0}).zoom`; **`START_ZOOM = fz+1`** (вся область в кадре); `jumpTo({zoom: START_ZOOM})`; **`setMinZoom(START_ZOOM − 0.70)`** — зум-аут **максимум 2 нажатия минуса** (шаг 0.35), дальше блок.
 - `updateZoutBtn()` гасит кнопку «−» (opacity .3, pointer-events:none) при `zoom ≤ minZoom+0.05`.
-- `applyPanLock()` (по `zoomend`): на стартовом зуме `dragPan.disable()`; при приближении `enable()`. Клик/поиск приближают программно — от пан-лока не зависят.
+- `applyPanLock()` (по `zoomend`): **пан заблокирован на старте и 2 отдалениях** (`zoom ≤ START_ZOOM+0.05` → `dragPan.disable()` + `setMaxBounds(null)`, чтобы зум-аут до minZoom не блокировался); при **зуме-ин** → `dragPan.enable()` + **`setMaxBounds(PAN_BOUNDS)`** = пан только в пределах области. Клик/поиск приближают программно — от пан-лока не зависят.
+- `PAN_BOUNDS = [[31.48,45.72],[35.15,47.65]]` — реальные края парцел Херсонщины +~0.05° («до краёв области +1 см, не дальше»). `maxBounds` не трогает зум (его floor ниже minZoom).
 - Source `parcels` `minzoom:6, maxzoom:14`; map `minZoom:6` → **вся область рендерится участками с первого кадра на любых экранах** (костыль `minZoom:8`, который обрезал область на узких, снят — тайлсет пересобран `-Z6`).
 
 ### Подложки (3 кнопки в HUD, `setBase()` / `setBaseLabels()`)
