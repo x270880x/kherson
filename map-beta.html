@@ -191,7 +191,7 @@ function addCouncilLabels(){
   // районный центр = главное (макс. участков) урбан-НП района; если урбан нет — макс. участков
   const centers=new Set(), byR={};
   for(const c of pts){ const r=raionOf(c.c); if(r) (byR[r]=byR[r]||[]).push(c); }
-  for(const r in byR){ if(r==='город Херсон'||r==='Верхнерогачикский район') continue;   // Херсон и Верхній Рогачик добавлены вручную — не метим центром село (Зеленівку / Зелене)
+  for(const r in byR){ if(r==='город Херсон'||r==='Верхнерогачикский район'||r==='Великоалександровский район') continue;   // Херсон, Верхній Рогачик и Велика Олександрівка добавлены вручную как центры — не промоутим в центр село данных (иначе Борозенське/Зеленівка ошибочно станут райцентром на старте)
     const g=byR[r], urb=g.filter(c=>isUrban(c.n)), pool=urb.length?urb:g;
     const best=pool.reduce((a,b)=>(+b.total||0)>(+a.total||0)?b:a); if(best) centers.add(best.c); }
   const LABEL_HIDE=new Set(['6523855000']);   // дубль-подпись «Нижние Серогозы — поля общины» рядом с самим смт — текст не выводим (участки остаются)
@@ -220,7 +220,12 @@ function addCouncilLabels(){
   // соседние НП, попадающие ВНУТРЬ выпуклой оболочки (реальная граница области вогнутая) — гасим принудительно
   const OUT_OF_REGION=['Армянск','Армянськ','Красноперекопск','Красноперекопськ'];
   const nm=['coalesce',['get','name:ru'],['get','name:latin'],['get','name']];
-  map.setPaintProperty('lbl-place','text-opacity',['case',['in',nm,['literal',OUT_OF_REGION]],0.4,['within',hull],1,0.4]);
+  // НП других областей (в ручном списке ИЛИ вне оболочки) — ещё тусклее и в ~1.5 раза мельче
+  const isOut=['any',['in',nm,['literal',OUT_OF_REGION]],['!',['within',hull]]];
+  map.setPaintProperty('lbl-place','text-opacity',['case',isOut,0.25,1]);
+  // zoom-interpolate снаружи, data-driven (свои/чужие) выходы внутри — чужие в ~1.5 раза мельче
+  map.setLayoutProperty('lbl-place','text-size',
+    ['interpolate',['exponential',1.2],['zoom'],6,['case',isOut,8.8,13.2],11,['case',isOut,12,18]]);
   // (2) Убрать ДУБЛИ: вырезаем из OMT lbl-place названия, которые рисуем сами (центры/советы) — по name:ru, не по позиции
   const bareRu=n=>{ const m=(n||'').match(/\(([^)]+)\)\s*$/); return m?m[1].trim():(n||''); };
   const ourNames=[...new Set([...pts.map(c=>bareRu(c.n)),'Херсон','Верхний Рогачик','Верхній Рогачик','Новая Збурьевка','Нова Збурьевка','Великая Александровка','Велика Олександрівка','Нововоронцовка','Нововоронцівка'])];   // + ручной hide чужих OMT-сёл внутри области
@@ -302,7 +307,7 @@ function fitNearestN(lng, lat, n){
   map.easeTo({center:[lng,lat], zoom:z, duration:700, essential:true});
 }
 // Прогрессивный drill по повторным кликам на ОДНО село: 1-й клик ~8 НП, 2-й — 3, 3-й — 1 (село по центру). Клик по другому селу / району — заново.
-let drillCode='', drillN=0; const DRILL_SEQ=[8,3,1];
+let drillCode='', drillN=0; const DRILL_SEQ=[4,2,1];   // клик по селу → видно ~4 села; повторный клик ближе (2 → 1)
 function drillVillage(lng, lat){
   const nc=nearestCouncil(lng,lat).best, code=nc?nc.c:'_';
   if(code===drillCode) drillN=Math.min(drillN+1, DRILL_SEQ.length-1); else { drillCode=code; drillN=0; }
@@ -322,9 +327,8 @@ map.on('click','lbl-place', e=>{
         const pfx=best.c.slice(2,5);
         const rc=CIDX.filter(c=>c.c.slice(2,5)===pfx&&c.lat&&c.lon);
         if(rc.length){
-          const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг клика → точка по центру
-          const cam=map.cameraForBounds([[lng-rLon-.03,lat-rLat-.03],[lng+rLon+.03,lat+rLat+.03]],{padding:40});
-          map.easeTo({center:[lng,lat], zoom:cam?cam.zoom:9, duration:1600, essential:true});
+          const los=rc.map(c=>c.lon), las=rc.map(c=>c.lat);   // фактический bbox района → весь район в кадре по максимуму
+          map.fitBounds([[Math.min(...los)-.05,Math.min(...las)-.05],[Math.max(...los)+.05,Math.max(...las)+.05]],{padding:22,duration:1600,essential:true});
           return;
         }
       }
@@ -385,9 +389,8 @@ map.on('click','centers-hit', e=>{
   const rname=RAION_BY_PREFIX[f.properties.rpfx]||'';
   const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):[]).filter(c=>c.lat&&c.lon);
   if(rc.length){
-    const rLon=Math.max(...rc.map(c=>Math.abs(c.lon-lng))), rLat=Math.max(...rc.map(c=>Math.abs(c.lat-lat)));   // симметрично вокруг центра → он строго по центру, район целиком
-    const cam=map.cameraForBounds([[lng-rLon-.03,lat-rLat-.03],[lng+rLon+.03,lat+rLat+.03]],{padding:40});
-    map.easeTo({center:[lng,lat], zoom:cam?cam.zoom:9, duration:1600, essential:true});
+    const los=rc.map(c=>c.lon), las=rc.map(c=>c.lat);   // фактический bbox района → весь район в кадре по максимуму
+    map.fitBounds([[Math.min(...los)-.05,Math.min(...las)-.05],[Math.max(...los)+.05,Math.max(...las)+.05]],{padding:22,duration:1600,essential:true});
     return;
   }
   map.flyTo({center:[lng,lat],zoom:9,duration:1600,essential:true});
@@ -509,6 +512,8 @@ map.on('load', ()=>{
     const fz = cam.zoom;                       // «вся область в кадре»
     map.setMinZoom(fz - 1);                     // нижний предел = на 2 пункта ниже старта
     map.jumpTo({ center: cam.center, zoom: fz + 1 });   // стартовый кадр — на 1 пункт ближе
+    // подписи сёл — только при приближении (выше старта), на обзоре остаются лишь райцентры
+    if(map.getLayer('lbl-councils')) map.setLayoutProperty('lbl-councils','minzoom', fz + 1.6);
     updateZoutBtn(); applyPanLock();
   };
   map.once('idle', setupStart);
@@ -556,14 +561,16 @@ let fineRun=false, finePend=false;
 // Межевание — глобальный слой razmezh (есть на всех зумах), поэтому фильтр работает и на старте без порога зума
 function setRazmezh(mz){
   if(!map.getLayer('razmezh-fill')) return;
-  if(mz==='yes'){   // только размежёванные — фиолетовые видны солидно на любом зуме
-    map.setLayoutProperty('razmezh-fill','visibility','visible'); map.setLayoutProperty('razmezh-line','visibility','visible');
-    map.setPaintProperty('razmezh-fill','fill-opacity',0.6);
+  if(mz==='yes'){   // только размежёванные — БЕЗ заливки, только розовый ободок (как в оригинале)
+    map.setLayoutProperty('razmezh-fill','visibility','none');
+    map.setLayoutProperty('razmezh-line','visibility','visible');
+    map.setPaintProperty('razmezh-line','line-width',['interpolate',['linear'],['zoom'],6,0.7,10,1.3,14,2.4]);
   } else if(mz==='no'){   // только без межевания — слой межевания скрыт
     map.setLayoutProperty('razmezh-fill','visibility','none'); map.setLayoutProperty('razmezh-line','visibility','none');
   } else {   // по умолчанию — лёгкая заливка, гаснущая к z13 (как было)
     map.setLayoutProperty('razmezh-fill','visibility','visible'); map.setLayoutProperty('razmezh-line','visibility','visible');
     map.setPaintProperty('razmezh-fill','fill-opacity',['interpolate',['linear'],['zoom'],8,0.35,13,0]);
+    map.setPaintProperty('razmezh-line','line-width',2.5);
   }
 }
 async function fineUpdate(){
