@@ -484,6 +484,10 @@ const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или 
 const OVERVIEW_CENTER = L.latLng(46.6354, 32.6169);   // Херсон — центр обзора «Вся карта»
 // Гео-охват ≈ зум 9 вокруг Херсона (≈ z9 на экране ~1440px); вписываем его в экран через flyToBounds → зум сам подстраивается под размер экрана
 const OVERVIEW_BOX = L.latLngBounds([46.6354 - 0.85, 32.6169 - 1.98], [46.6354 + 0.85, 32.6169 + 1.98]);
+function flyOverview(animate) {   // обзор для ОБЕИХ плашек: вписываем гео-бокс в экран (зум по размеру экрана) или фикс. ?zoom=
+  if (isFinite(Z_PARAM) && Z_PARAM > 0) map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: !!animate, duration: 0.6 });
+  else map.flyToBounds(OVERVIEW_BOX, { animate: !!animate, duration: 0.6 });
+}
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
@@ -1142,8 +1146,7 @@ function setOwnMode(mode) {
     activePolyCode = null;
     if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);   // вместо кружков — подписи названий (как в бете)
     syncParcelTiles();    // + лёгкие векторные тайлы (по слою на форму; клик по участку с z12.5)
-    if (isFinite(Z_PARAM) && Z_PARAM > 0) map.flyTo(OVERVIEW_CENTER, Z_PARAM, { duration: 0.6 });   // явный ?zoom= — фикс. зум
-    else map.flyToBounds(OVERVIEW_BOX, { duration: 0.6 });                                          // по умолчанию — охват ~z9, вписанный в экран (зум по размеру экрана)
+    flyOverview(true);   // обзор, привязанный к экрану (как и «По сёлам»)
     labelsUpdate();
   } else {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
@@ -1152,6 +1155,7 @@ function setOwnMode(mode) {
     labelsClear();           // снять подписи
     if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки-маркеры
     buildMarkers();
+    flyOverview(true);   // «По сёлам»: тот же обзор, привязанный к экрану (как у «Вся карта»)
   }
   applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
   applyOwnModeUI();
@@ -2045,16 +2049,13 @@ document.getElementById('mobile-filters-btn').addEventListener('click', e => {
 map.on('click', () => asideLeft.classList.remove('open'));
 buildMarkers();
 
-// Fit bounds to all councils
-const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
-map.fitBounds(bounds, { padding: [40, 40] });
-// ?z=/?zoom= задаёт зум напрямую и сразу открывает «Вся карта» (для подбора зума через URL); иначе старт на ~10% ближе
+// Старт: ?z=/?zoom= — сразу «Вся карта» на заданном зуме; иначе «По сёлам» с тем же обзором, привязанным к экрану
 if (isFinite(Z_PARAM) && Z_PARAM > 0) {
-  setOwnMode('all');   // сразу режим подписей «Вся карта»
+  setOwnMode('all');
   map.stop();
-  map.setView([46.6354, 32.6169], Z_PARAM, { animate: false });   // центр — Херсон (плотные данные), чтобы карта была видна на любом зуме
+  map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: false });
 } else {
-  map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
+  flyOverview(false);   // мгновенный обзор «как при z9», вписанный в экран
 }
 </script>
 </body>
