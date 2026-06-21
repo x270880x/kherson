@@ -481,7 +481,9 @@ function detailTitle(c) {
 const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
 const _qs = new URLSearchParams(location.search);
 const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или ?zoom=8.5 — зум; при наличии сразу открываем «Вся карта»
-const ALL_ZOOM = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : 9.0;   // дефолтный зум открытия «Вся карта» (без ?zoom=)
+const OVERVIEW_CENTER = L.latLng(46.6354, 32.6169);   // Херсон — центр обзора «Вся карта»
+// Гео-охват ≈ зум 9 вокруг Херсона (≈ z9 на экране ~1440px); вписываем его в экран через flyToBounds → зум сам подстраивается под размер экрана
+const OVERVIEW_BOX = L.latLngBounds([46.6354 - 0.85, 32.6169 - 1.98], [46.6354 + 0.85, 32.6169 + 1.98]);
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
@@ -1140,8 +1142,8 @@ function setOwnMode(mode) {
     activePolyCode = null;
     if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);   // вместо кружков — подписи названий (как в бете)
     syncParcelTiles();    // + лёгкие векторные тайлы (по слою на форму; клик по участку с z12.5)
-    const pts = COUNCILS.filter(c => c.lat).map(c => [c.lat, c.lon]);
-    if (pts.length) map.flyTo(L.latLngBounds(pts).getCenter(), ALL_ZOOM, { duration: 0.6 });  // показать область, зум ALL_ZOOM (?z=)
+    if (isFinite(Z_PARAM) && Z_PARAM > 0) map.flyTo(OVERVIEW_CENTER, Z_PARAM, { duration: 0.6 });   // явный ?zoom= — фикс. зум
+    else map.flyToBounds(OVERVIEW_BOX, { duration: 0.6 });                                          // по умолчанию — охват ~z9, вписанный в экран (зум по размеру экрана)
     labelsUpdate();
   } else {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
