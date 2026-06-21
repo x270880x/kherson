@@ -248,6 +248,9 @@ function geomHas(g,x,y){ const f=rr=>ptInRing(x,y,rr[0])&&!rr.slice(1).some(h=>p
 // Район РФ по кадастровому коду (как в основной карте) — code[2:5] → район
 const RAION_BY_PREFIX={"101":"город Херсон","104":"Каховский район","107":"город Новая Каховка","201":"город Херсон","203":"Белозёрский район","206":"Бериславский район","209":"Великоалександровский район","211":"Генический район","212":"Великолепетихский район","215":"Верхнерогачикский район","218":"Высокопольский район","221":"Генический район","223":"Голопристанский район","226":"Горностаевский район","229":"Ивановский район","232":"Каланчакский район","235":"Каховский район","238":"Нижнесерогозский район","241":"Нововоронцовский район","244":"Новотроицкий район","247":"Скадовский район","250":"Алешкинский район","254":"Чаплынский район"};
 const raionOf=code=>RAION_BY_PREFIX[(code||'').slice(2,5)]||'';
+let CAT_RU={};   // перевод «Назначение» укр→рус (фильтр — укр, попап — рус)
+fetch(BASE+'categories-ru.json').then(r=>r.json()).then(d=>{CAT_RU=d;}).catch(()=>{});
+const catRu=ct=>CAT_RU[ct]||ct||'';
 const OTC={'Приватна власність':['Частная собственность','#4caf7d'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#e05252']};
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 // Копирование кадастрового номера из попапа (как на основной карте)
@@ -261,7 +264,7 @@ function popupHTML(rec, cname){
   const rai=raionOf(rec.c); if(rai) h+='<div style="color:#8b91a8;font-size:11px;margin-bottom:4px;margin-top:-2px">'+esc(rai)+'</div>';
   if(rec.o) h+='<div><span style="color:#8b91a8">собств.:</span> '+esc(rec.o)+'</div>';
   h+='<div style="color:'+ot[1]+';font-size:10px;margin-top:4px">'+ot[0]+'</div>';
-  if(rec.ct) h+='<div style="color:#8b91a8;font-size:10px;margin-top:4px">Назначение: <span style="color:#cdd2e0">'+esc(rec.ct)+'</span></div>';
+  if(rec.ct) h+='<div style="color:#8b91a8;font-size:10px;margin-top:4px">Назначение: <span style="color:#cdd2e0">'+esc(catRu(rec.ct))+'</span></div>';
   if(rec.use) h+='<div style="color:#8b91a8;font-size:10px;margin-top:2px">Использование: <span style="color:#cdd2e0">'+esc(rec.use)+'</span></div>';
   if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</span>'+copyBtn(rec.mz,'Скопировать кадастр РФ')+'</div></div>';
   return h+'</div>';
@@ -441,7 +444,7 @@ qEl.addEventListener('input', ()=>{
   const low=v.toLowerCase();
   const settle=CIDX.map((c,i)=>({c,i})).filter(o=>ruName(o.c.n).toLowerCase().includes(low)||(o.c.n||'').toLowerCase().includes(low)).slice(0,6);
   const rent=RENTERS.filter(r=>r.toLowerCase().includes(low)).slice(0,5);
-  let html=settle.map(o=>'<div class="qrow" data-i="'+o.i+'">'+esc(ruName(o.c.n))+'</div>').join('');
+  let html=settle.map(o=>'<div class="qrow" data-i="'+o.i+'">'+esc(ruName(o.c.n))+(raionOf(o.c.c)?' <span style="color:#8b91a8;font-size:10px">· '+esc(raionOf(o.c.c))+'</span>':'')+'</div>').join('');
   html+=rent.map(r=>'<div class="qrow" data-r="'+esc(r)+'"><span style="color:#8b91a8;font-size:10px">аренд.</span> '+esc(r)+'</div>').join('');
   qres.innerHTML = html || '<div class="qrow muted">ничего не найдено</div>';
 });

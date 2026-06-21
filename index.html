@@ -443,6 +443,9 @@ const RAION_BY_PREFIX = {
 };
 const raionOf = code => RAION_BY_PREFIX[(code || '').slice(2, 5)] || '';
 const ruName = name => nameParts(name).ru;   // только русское название (без украинского)
+let CAT_RU = {};   // перевод «Назначение» укр→рус (в фильтре остаётся укр, в попапе — рус)
+fetch('categories-ru.json').then(r => r.json()).then(d => { CAT_RU = d; }).catch(() => {});
+const catRu = ct => CAT_RU[ct] || ct || '';
 
 // Заголовок детали: русское название крупно + «район (укр. название)» мелким снизу
 function detailTitle(c) {
@@ -661,7 +664,8 @@ function buildParcelPopup(cad, data, council) {
   return `
     <div style="font-size:12px;color:#e8e8e8;max-width:320px;line-height:1.45">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:#e8c547;font-size:13px">${cad}</span>${copyBtn(cad, 'Скопировать кадастр (УКР)')}</div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:6px">${data.a} га · ${council ? escapeHtml(ruName(council.name)) : ''}</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:6px">${data.a} га · ${council ? escapeHtml(ruName(council.name)) : ''}${raionOf(cad) ? ' · ' + escapeHtml(raionOf(cad)) : ''}</div>
+      ${data.ct ? `<div style="margin-bottom:2px"><b style="color:#aaa">назнач.:</b> ${escapeHtml(catRu(data.ct))}</div>` : ''}
       ${data.r ? `<div><b style="color:#aaa">аренд.:</b> ${data.r}</div>` : ''}
       ${data.o ? `<div><b style="color:#aaa">собств.:</b> ${data.o}</div>` : ''}
       ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
@@ -1783,7 +1787,7 @@ search.addEventListener('input', e => {
     sr.innerHTML = matches.slice(0,20).map((c,i)=>`
       <div class="item" data-i="${i}">
         <div class="cad">${c.code}</div>
-        <div class="who">${escapeHtml(ruName(c.name))} · ${c.total} участков</div>
+        <div class="who">${escapeHtml(ruName(c.name))}${raionOf(c.code)?' · '+escapeHtml(raionOf(c.code)):''} · ${c.total} участков</div>
       </div>
     `).join('') || '<div class="item" style="color:var(--muted)">Сельсовет не найден</div>';
     sr.style.display = 'block';
@@ -1828,12 +1832,12 @@ search.addEventListener('input', e => {
     if (r.type === 'council') return `
       <div class="item" data-i="${i}">
         <div class="cad">${escapeHtml(ruName(r.council.name))}</div>
-        <div class="who">${r.council.code} · ${r.council.total} участков</div>
+        <div class="who">${r.council.code}${raionOf(r.council.code)?' · '+escapeHtml(raionOf(r.council.code)):''} · ${r.council.total} участков</div>
       </div>`;
     return `
       <div class="item" data-i="${i}">
         <div class="cad">${escapeHtml(r.p.c)}</div>
-        <div class="who">${escapeHtml(ruName(r.council.name))}${r.p.r? ' · аренд.: '+escapeHtml(r.p.r.slice(0,40)):''}${r.p.o? ' · '+escapeHtml(r.p.o.slice(0,40)):''}</div>
+        <div class="who">${escapeHtml(ruName(r.council.name))}${raionOf(r.council.code)?' · '+escapeHtml(raionOf(r.council.code)):''}${r.p.r? ' · аренд.: '+escapeHtml(r.p.r.slice(0,40)):''}${r.p.o? ' · '+escapeHtml(r.p.o.slice(0,40)):''}</div>
       </div>`;
   }).join('');
   sr.style.display = 'block';
