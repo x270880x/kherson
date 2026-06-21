@@ -481,9 +481,9 @@ function detailTitle(c) {
 const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
 const _qs = new URLSearchParams(location.search);
 const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или ?zoom=8.5 — зум; при наличии сразу открываем «Вся карта»
-const OVERVIEW_CENTER = L.latLng(46.6354, 32.6169);   // Херсон — центр обзора «Вся карта»
-// Гео-охват ≈ зум 9 вокруг Херсона (≈ z9 на экране ~1440px); вписываем его в экран через flyToBounds → зум сам подстраивается под размер экрана
-const OVERVIEW_BOX = L.latLngBounds([46.6354 - 0.85, 32.6169 - 1.98], [46.6354 + 0.85, 32.6169 + 1.98]);
+const OVERVIEW_CENTER = L.latLngBounds(COUNCILS.filter(c => c.lat).map(c => [c.lat, c.lon])).getCenter();   // центр области (bbox всех советов)
+// Гео-охват ≈ зум 9 вокруг центра области (≈ z9 на экране ~1440px); вписываем в экран через flyToBounds → зум сам подстраивается под размер экрана
+const OVERVIEW_BOX = L.latLngBounds([OVERVIEW_CENTER.lat - 0.85, OVERVIEW_CENTER.lng - 1.98], [OVERVIEW_CENTER.lat + 0.85, OVERVIEW_CENTER.lng + 1.98]);
 function flyOverview(animate) {   // обзор для ОБЕИХ плашек: вписываем гео-бокс в экран (зум по размеру экрана) или фикс. ?zoom=
   if (isFinite(Z_PARAM) && Z_PARAM > 0) map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: !!animate, duration: 0.6 });
   else map.flyToBounds(OVERVIEW_BOX, { animate: !!animate, duration: 0.6 });
