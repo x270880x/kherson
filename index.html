@@ -812,7 +812,7 @@ function buildLabelPts() {
     ctr: centers.has(c.c), big: BIG_TOWNS.has(c.c), rpfx: c.c.slice(2, 5),
   }));
   // Херсон (~280k) нет в данных как единый НП — добавляем вручную как центр (виден на обзоре)
-  LABEL_PTS.push({ c: '__kherson', n: 'Херсон', lat: 46.6354, lon: 32.6169, total: 999999, o: null, ha: null, name: 'Херсон', ctr: true, big: true, capital: true, rpfx: '201' });
+  LABEL_PTS.push({ c: '__kherson', n: 'Херсон', lat: 46.7000, lon: 32.6169, total: 999999, o: null, ha: null, name: '★Херсон', ctr: true, big: true, capital: true, rpfx: '201' });   // подпись со звездой, у северного края города
   OBLAST_BOUNDS = L.latLngBounds(LABEL_PTS.map(p => [p.lat, p.lon]));
 }
 fetch('councils-index.json').then(r => r.json())
