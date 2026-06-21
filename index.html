@@ -28,7 +28,7 @@
     --surface2: #1f2433;
     --border: #2a2f42;
     --accent: #e8c547;
-    --red: #e05252;
+    --red: #e11d1d;
     --green: #4caf7d;
     --blue: #4a9eff;
     --orange: #e8a547;
@@ -403,9 +403,9 @@ const OWN_COLOR = {
   'Приватна власність': '#4caf7d',
   'Комунальна власність': '#e8c547',
   'Державна власність': '#4a9eff',
-  'Не визначено': '#e05252'
+  'Не визначено': '#e11d1d'
 };
-const ownColor = s => OWN_COLOR[s] || '#e05252';
+const ownColor = s => OWN_COLOR[s] || '#e11d1d';
 
 // Короткие подписи форм собственности (в 1 строку)
 const OWN_SHORT = {
@@ -656,7 +656,7 @@ const copyBtn = (text, title) => `<button onclick="copyCad(this,'${text}')" titl
 
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
-  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e05252':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
+  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#e11d1d':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
   if (!data) {
     return `<div style="font-size:12px;color:#e8c547"><div style="display:flex;align-items:center;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">${cad}</span>${copyBtn(cad, 'Скопировать кадастр (УКР)')}</div><div style="color:#aaa;font-size:11px">нет данных в базе</div>${basketBtn}</div>`;
   }
@@ -730,7 +730,7 @@ const LABEL_MIN_ZOOM = 11;              // подписи сёл — от это
 const LABEL_MAX_COUNCILS = 60;          // если в кадре больше — подписи прячем (мусор)
 let parcelTilesAll = null;          // «Полная карта»: один слой всех форм (эффективно)
 const parcelLayers = {};            // «Вся карта»: по слою на форму — выключение одной не трогает остальные
-const TILE_OWN_COLOR = { p: '#4caf7d', k: '#e8c547', g: '#4a9eff', n: '#e05252' };  // = ownColor
+const TILE_OWN_COLOR = { p: '#4caf7d', k: '#e8c547', g: '#4a9eff', n: '#e11d1d' };  // = ownColor
 const OT_SHORT = { 'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n' };
 const allMapVisible = new Set(['p','k','g','n']);   // формы, видимые в режиме «Вся карта» (по умолчанию все, вкл. частную)
 const TILE_VG_OPTS = { rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 19, maxNativeZoom: 14 };
@@ -1530,7 +1530,7 @@ function renderBasketPanel() {
         <h2>📌 Подборка</h2>
         ${items.length ? `<div style="display:flex;gap:6px;flex-shrink:0">
           <button class="btn-export-sm" onclick="document.getElementById('btn-basket-export').click()">📥 Excel</button>
-          <button class="btn-export-sm" title="Очистить подборку" onclick="document.getElementById('btn-basket-clear').click()" style="background:#e05252;color:#fff">✕ Сброс</button>
+          <button class="btn-export-sm" title="Очистить подборку" onclick="document.getElementById('btn-basket-clear').click()" style="background:#e11d1d;color:#fff">✕ Сброс</button>
         </div>` : ''}
       </div>
       <div class="meta"><span>${items.length} участков</span><span>${totalStr} га</span></div>
@@ -1541,7 +1541,7 @@ function renderBasketPanel() {
           <div class="bar-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dotted var(--border)">
             <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${col};word-break:break-all">${cad}</span>
             <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent);flex-shrink:0;margin-left:auto">${a != null ? a + ' га' : '—'}</span>
-            <button onclick="basketToggle('${cad}')" title="убрать" style="background:none;border:none;color:#e05252;cursor:pointer;font-size:14px;flex-shrink:0;line-height:1">✕</button>
+            <button onclick="basketToggle('${cad}')" title="убрать" style="background:none;border:none;color:#e11d1d;cursor:pointer;font-size:14px;flex-shrink:0;line-height:1">✕</button>
           </div>`; }).join('') + (items.length > CAP ? `<div style="color:var(--muted);font-size:11px;padding:8px 0">…и ещё ${items.length - CAP}. Полный список — в выгрузке Excel.</div>` : '') : '<div style="color:var(--muted);font-size:12px;padding:8px 0">Подборка пуста</div>'}
       </div>
     </div>`;
@@ -1574,7 +1574,7 @@ function toggleBasketBtn(btn, cadnum) {
   basketToggle(cadnum);
   const inB = basket.has(cadnum);
   btn.textContent = inB ? '− убрать из подборки' : '+ в подборку';
-  btn.style.background = inB ? '#e05252' : 'var(--accent)';
+  btn.style.background = inB ? '#e11d1d' : 'var(--accent)';
 }
 
 // Рамочное выделение: Shift+перетаскивание мышкой → добавить все участки в области в подборку
