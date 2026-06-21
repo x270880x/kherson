@@ -479,6 +479,8 @@ function detailTitle(c) {
 
 // Init map
 const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
+const Z_PARAM = parseFloat(new URLSearchParams(location.search).get('z'));   // ?z=8.5 — стартовый зум и зум открытия «Вся карта» (можно менять в URL)
+const ALL_ZOOM = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : 8.0;
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
@@ -1138,7 +1140,7 @@ function setOwnMode(mode) {
     if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);   // вместо кружков — подписи названий (как в бете)
     syncParcelTiles();    // + лёгкие векторные тайлы (по слою на форму; клик по участку с z12.5)
     const pts = COUNCILS.filter(c => c.lat).map(c => [c.lat, c.lon]);
-    if (pts.length) map.flyTo(L.latLngBounds(pts).getCenter(), 8.0, { duration: 0.6 });  // показать область, зум 8.0
+    if (pts.length) map.flyTo(L.latLngBounds(pts).getCenter(), ALL_ZOOM, { duration: 0.6 });  // показать область, зум ALL_ZOOM (?z=)
     labelsUpdate();
   } else {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
@@ -2043,8 +2045,9 @@ buildMarkers();
 // Fit bounds to all councils
 const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
 map.fitBounds(bounds, { padding: [40, 40] });
-// старт на ~10% ближе: целочисленный фит + log2(1.1)
-map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
+// ?z= задаёт стартовый зум напрямую; иначе старт на ~10% ближе: целочисленный фит + log2(1.1)
+if (isFinite(Z_PARAM) && Z_PARAM > 0) map.setZoom(Z_PARAM, { animate: false });
+else map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
 </script>
 </body>
 </html>
