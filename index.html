@@ -479,7 +479,8 @@ function detailTitle(c) {
 
 // Init map
 const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
-const Z_PARAM = parseFloat(new URLSearchParams(location.search).get('z'));   // ?z=8.5 — стартовый зум и зум открытия «Вся карта» (можно менять в URL)
+const _qs = new URLSearchParams(location.search);
+const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или ?zoom=8.5 — зум; при наличии сразу открываем «Вся карта»
 const ALL_ZOOM = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : 8.0;
 
 // Polygon layers cache, keyed by council code
@@ -2045,9 +2046,13 @@ buildMarkers();
 // Fit bounds to all councils
 const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
 map.fitBounds(bounds, { padding: [40, 40] });
-// ?z= задаёт стартовый зум напрямую; иначе старт на ~10% ближе: целочисленный фит + log2(1.1)
-if (isFinite(Z_PARAM) && Z_PARAM > 0) map.setZoom(Z_PARAM, { animate: false });
-else map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
+// ?z=/?zoom= задаёт зум напрямую и сразу открывает «Вся карта» (для подбора зума через URL); иначе старт на ~10% ближе
+if (isFinite(Z_PARAM) && Z_PARAM > 0) {
+  map.setZoom(Z_PARAM, { animate: false });
+  setOwnMode('all');   // сразу режим подписей «Вся карта» на заданном зуме
+} else {
+  map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
+}
 </script>
 </body>
 </html>
