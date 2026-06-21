@@ -482,7 +482,7 @@ const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom
 const _qs = new URLSearchParams(location.search);
 const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или ?zoom=8.5 — зум; при наличии сразу открываем «Вся карта»
 const OVERVIEW_CENTER = L.latLng(46.6895, 33.5461);   // село Роздольне (Раздольное) — центр карты (у центра области)
-const OVERVIEW_BASE_ZOOM = 9.0;                        // дефолтный зум на эталонном экране ~1440px
+const OVERVIEW_BASE_ZOOM = 8.7;                        // дефолтный зум на эталонном экране ~1440px
 function overviewZoom() { return OVERVIEW_BASE_ZOOM + Math.log2((window.innerWidth || 1440) / 1440); }   // 9.0 на экране ~1440px, авто-подгон под ширину экрана
 function flyOverview(animate) {   // обзор для ОБЕИХ плашек: центр — Раздольное, зум 9.0 с подстройкой под экран (или фикс. ?zoom=)
   const z = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : overviewZoom();
