@@ -775,7 +775,7 @@ function ensureParcelTiles() {
     vectorTileLayerStyles: {
       parcels: (props) => {
         if (ownMode === 'all' && !allMapVisible.has(props.o)) return { fill: false, stroke: false };   // в «Вся карта» прятать невыбранные формы
-        return { weight: 0.35, color: '#1a1a1a', opacity: 0.85, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: 0.55 };
+        return { weight: 0.35, color: '#1a1a1a', opacity: 0.85, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: 0.8 };
       }
     }
   });
