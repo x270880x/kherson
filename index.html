@@ -2048,8 +2048,9 @@ const bounds = L.latLngBounds(COUNCILS.filter(c=>c.lat).map(c=>[c.lat,c.lon]));
 map.fitBounds(bounds, { padding: [40, 40] });
 // ?z=/?zoom= задаёт зум напрямую и сразу открывает «Вся карта» (для подбора зума через URL); иначе старт на ~10% ближе
 if (isFinite(Z_PARAM) && Z_PARAM > 0) {
-  map.setZoom(Z_PARAM, { animate: false });
-  setOwnMode('all');   // сразу режим подписей «Вся карта» на заданном зуме
+  setOwnMode('all');   // сразу режим подписей «Вся карта»
+  map.stop();
+  map.setView([46.6354, 32.6169], Z_PARAM, { animate: false });   // центр — Херсон (плотные данные), чтобы карта была видна на любом зуме
 } else {
   map.setZoom(Math.floor(map.getZoom()) + Math.log2(1.1), { animate: false });
 }
