@@ -56,7 +56,7 @@
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#2ecc71"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
   <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
-  <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#e11d1d"></span>Не определено</label>
+  <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#ff6f61"></span>Не определено</label>
   <div style="margin-top:8px;border-top:1px solid #20242f;padding-top:7px">
     <span style="color:#8b91a8">Категория земель:</span>
     <select id="f-ct"><option value="">все</option></select>
@@ -75,7 +75,7 @@
 <div id="basket">📌 <b id="bk-count">0</b> уч. <button id="bk-exp">CSV</button><button id="bk-clr">Очистить</button></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-const OWN = { p:['Частная','#2ecc71'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#e11d1d'] };
+const OWN = { p:['Частная','#2ecc71'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#ff6f61'] };
 // Границы всей Херсонской области (по экстенту 337 советов + небольшой запас) — стартовый кадр на весь экран
 const KHERSON_BOUNDS = [[31.80, 45.90], [35.10, 47.45]];   // [[з,ю],[в,с]]
 const map = new maplibregl.Map({
@@ -254,7 +254,7 @@ const raionOf=code=>RAION_BY_PREFIX[(code||'').slice(2,5)]||'';
 let CAT_RU={};   // перевод «Назначение» укр→рус (фильтр — укр, попап — рус)
 fetch(BASE+'categories-ru.json').then(r=>r.json()).then(d=>{CAT_RU=d;}).catch(()=>{});
 const catRu=ct=>CAT_RU[ct]||ct||'';
-const OTC={'Приватна власність':['Частная собственность','#2ecc71'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#e11d1d']};
+const OTC={'Приватна власність':['Частная собственность','#2ecc71'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#ff6f61']};
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 // Копирование кадастрового номера из попапа (как на основной карте)
 function fallbackCopy(text, ok){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); ok(); }catch(e){} document.body.removeChild(ta); }
@@ -470,7 +470,7 @@ function basketToggle(cad, geom, rec, cname){
   if(basket.has(cad)) basket.delete(cad); else basket.set(cad,{geom,rec,cname});
   basketRefresh();
 }
-const OWN_COLOR_EXPR=['match',['get','o'],'p','#2ecc71','k','#e8c547','g','#4a9eff','n','#e11d1d','#888888'];
+const OWN_COLOR_EXPR=['match',['get','o'],'p','#2ecc71','k','#e8c547','g','#4a9eff','n','#ff6f61','#888888'];
 const EMPTY={type:'FeatureCollection',features:[]};
 // Слой участков добавляем отложенно — подложка успевает прорисоваться, тяжёлые .pbf не блокируют первый кадр
 let parcelsAdded=false;
@@ -478,7 +478,7 @@ function addParcels(){
   if(parcelsAdded || !map.getSource('parcels') || !map.getLayer('lbl-water')) return;   // ждём, пока стиль готов (есть базовый слой)
   const before = 'lbl-water';   // под подписями; fine/basket добавятся выше
   map.addLayer({ id:'parcels-fill', type:'fill', source:'parcels', 'source-layer':'parcels',
-    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':['interpolate',['linear'],['zoom'],9,0.9,10,0.65,11,0.5], 'fill-antialias':false } }, before);
+    paint:{ 'fill-color':OWN_COLOR_EXPR, 'fill-opacity':['interpolate',['linear'],['zoom'],9,0.8,10,0.65,11,0.5], 'fill-antialias':false } }, before);
   // Обводка КАЖДОГО участка — чтобы соседние одного цвета не сливались (как на источнике).
   // Толщина растёт с зумом; видна уже с z12.5 (тонко), к z16+ — чёткая граница.
   map.addLayer({ id:'parcels-line', type:'line', source:'parcels', 'source-layer':'parcels', minzoom:12.5,
