@@ -191,15 +191,14 @@ function addCouncilLabels(){
   // районный центр = главное (макс. участков) урбан-НП района; если урбан нет — макс. участков
   const centers=new Set(), byR={};
   for(const c of pts){ const r=raionOf(c.c); if(r) (byR[r]=byR[r]||[]).push(c); }
-  for(const r in byR){ if(r==='город Херсон'||r==='Верхнерогачикский район'||r==='Великоалександровский район') continue;   // Херсон, Верхній Рогачик и Велика Олександрівка добавлены вручную как центры — не промоутим в центр село данных (иначе Борозенське/Зеленівка ошибочно станут райцентром на старте)
+  for(const r in byR){ if(r==='город Херсон'||r==='Великоалександровский район') continue;   // Херсон и Велика Олександрівка добавлены вручную как центры — не промоутим в центр село данных. Верхній Рогачик теперь корректный совет в данных (6521555100, смт) — авто-центр сам его выберет
     const g=byR[r], urb=g.filter(c=>isUrban(c.n)), pool=urb.length?urb:g;
     const best=pool.reduce((a,b)=>(+b.total||0)>(+a.total||0)?b:a); if(best) centers.add(best.c); }
   const LABEL_HIDE=new Set(['6523855000']);   // дубль-подпись «Нижние Серогозы — поля общины» рядом с самим смт — текст не выводим (участки остаются)
   const feats=pts.filter(c=>!LABEL_HIDE.has(c.c)).map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lon,c.lat]},properties:{name:ruName(c.n).replace(/^пгт\s+/i,''),total:c.total||0,ctr:centers.has(c.c),big:BIG_TOWNS.has(c.c),offLow:OFFLOW[c.c],rpfx:c.c.slice(2,5)}}));
   // Херсон (~280k) отсутствует в данных как единый НП — добавляем вручную как центр (на обзоре виден)
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[32.6169,46.6354]},properties:{name:'★Херсон',total:999999,ctr:true,big:true,capital:true,offLow:[1.5,0],rpfx:'201'}});   //   — волосяной пробел (звезда ближе к слову)
-  // Верхній Рогачик (центр Верхнерогачикского р-на) отсутствует в данных — добавляем вручную как центр
-  feats.push({type:'Feature',geometry:{type:'Point',coordinates:[34.3611,47.2647]},properties:{name:'Верхний Рогачик',total:5000,ctr:true,rpfx:'215'}});
+  // Верхній Рогачик теперь в данных как совет 6521555100 (исправлено имя «Зелене»→«Верхній Рогачик» по Яндексу+КОАТУУ) — ручная точка убрана, авто-центр выберет его сам
   // Велика Олександрівка (центр Великоалександровского р-на) отсутствует в данных — добавляем вручную как центр
   feats.push({type:'Feature',geometry:{type:'Point',coordinates:[33.2786,47.2536]},properties:{name:'Великая Александровка',total:5000,ctr:true,rpfx:'209'}});
   // Нововоронцовка: район 241 теперь есть в данных (смт + 12 сёл) — центр определяется автоматически, ручной плейсхолдер убран.
