@@ -734,9 +734,13 @@ const TILE_OWN_COLOR = { p: '#4caf7d', k: '#e8c547', g: '#4a9eff', n: '#e05252' 
 const OT_SHORT = { 'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n' };
 const allMapVisible = new Set(['p','k','g','n']);   // формы, видимые в режиме «Вся карта» (по умолчанию все, вкл. частную)
 const TILE_VG_OPTS = { rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 19, maxNativeZoom: 14 };
+function fillOp() {   // яркость заливки по зуму: обзор 0.95 → с z11 0.6 (обновляется при отрисовке новых тайлов при смене зума)
+  const z = map.getZoom();
+  return z <= 9 ? 0.95 : z >= 11 ? 0.6 : 0.95 - (z - 9) / 2 * 0.35;
+}
 function tileStyle(props, only) {   // only=undefined → красить все формы; only='p' → только эту форму
   if (only && props.o !== only) return [];
-  return { weight: 0.35, color: '#1a1a1a', opacity: 0.85, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: 0.8 };
+  return { weight: 0.35, color: '#1a1a1a', opacity: 0.85, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: fillOp() };
 }
 function ensureFormLayer(form) {    // слой одной формы (для «Вся карта»)
   return parcelLayers[form] || (parcelLayers[form] = L.vectorGrid.protobuf('tiles/{z}/{x}/{y}.pbf',
