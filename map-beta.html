@@ -518,8 +518,8 @@ map.on('load', ()=>{
     if(!cam || !isFinite(cam.zoom)) return;   // контейнер ещё не разложен — повторим по таймеру
     started=true;
     const fz = cam.zoom;                       // «вся область в кадре»
-    START_ZOOM = fz + 1;                          // старт — на 1 пункт ближе обзора (вся область в кадре)
-    map.setMinZoom(START_ZOOM - 0.70);            // зум-аут максимум 2 нажатия минуса (шаг 0.35), дальше блок
+    START_ZOOM = fz + 0.7;                         // старт ≈ 6.7 на тест-экране (fz≈6.0); вся область в кадре, чуть отдалённее прежнего fz+1
+    map.setMinZoom(START_ZOOM - 0.70);             // зум-аут максимум 2 нажатия минуса (шаг 0.35) → ровно fz (вся область в край), дальше блок
     map.jumpTo({ center: cam.center, zoom: START_ZOOM });
     // подписи сёл — только при приближении (выше старта), на обзоре остаются лишь райцентры
     if(map.getLayer('lbl-councils')) map.setLayoutProperty('lbl-councils','minzoom', fz + 1.6);
