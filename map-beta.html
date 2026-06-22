@@ -21,6 +21,7 @@
   #hud .bstat{font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:3px 0 5px;display:flex;flex-wrap:wrap;gap:2px 10px}
   #hud .bstat span{white-space:nowrap}
   #hud .bstat b{color:#cdd2e0;font-weight:600}
+  #hud .bhint{margin-top:9px;border-top:1px solid #20242f;padding-top:7px;font-size:11px;color:#8b91a8;line-height:1.5}
   .maplibregl-popup-content{background:#181c27;color:#e8e8ea;border:1px solid #2a2f42;font-size:12px}
   .maplibregl-popup-tip{border-top-color:#181c27!important;border-bottom-color:#181c27!important}
   #zoomctl{position:absolute;right:10px;bottom:28px;z-index:5;display:flex;flex-direction:column;gap:2px}
@@ -55,7 +56,7 @@
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
   <div class="bstat"><span><b>613 471</b> уч</span><span><b>2 162 361</b> га</span><span><b>326</b> сёл</span><span><b>20</b> р-нов</span><span><b>2 410</b> разм.</span></div>
   <div style="margin:4px 0"><button class="bt" data-b="light">Светлая</button><button class="bt on" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
-  <div>Все ~613к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
+  <div>Все ~613к участков, плавно на любом зуме. Галочки — форма собственности.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#2ecc71"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
   <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
@@ -63,14 +64,13 @@
   <div style="margin-top:8px;border-top:1px solid #20242f;padding-top:7px">
     <span style="color:#8b91a8">Категория земель:</span>
     <select id="f-ct"><option value="">все</option></select>
-    <span style="color:#8b91a8;display:block;margin-top:5px">Год аренды (до):</span>
-    <select id="f-ly"><option value="">все</option><option value="none">без аренды</option><option value="expired">истёкшие (до 2026)</option></select>
     <span style="color:#8b91a8;display:block;margin-top:5px">Арендатор:</span>
     <input id="f-r" list="renters-dl" placeholder="имя или часть" autocomplete="off"/>
     <datalist id="renters-dl"></datalist>
     <span style="color:#8b91a8;display:block;margin-top:5px">Межевание (РФ кадастр):</span>
     <select id="f-mz"><option value="">все</option><option value="yes">только размежёванные</option><option value="no">только без межевания</option></select>
   </div>
+  <div class="bhint"><b>Клик</b> — данные участка · <b>Shift+клик / Shift+рамка</b> — в подборку</div>
 </div>
 <div id="fine-hint"></div>
 <div id="zoomctl"><button id="zin" aria-label="Приблизить">+</button><button id="zout" aria-label="Отдалить">−</button></div>
@@ -649,12 +649,9 @@ async function fineUpdate(){
 }
 document.getElementById('f-mz').addEventListener('change', e=>{ fine.mz=e.target.value; fineUpdate(); });
 document.getElementById('f-ct').addEventListener('change', e=>{ fine.ct=e.target.value; fineUpdate(); });
-document.getElementById('f-ly').addEventListener('change', e=>{ fine.ly=e.target.value; fineUpdate(); });
 fetch(BASE+'filters-beta.json').then(r=>r.json()).then(F=>{
   const ct=document.getElementById('f-ct');
   (F.categories||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c.length>52?c.slice(0,50)+'…':c; ct.appendChild(o); });
-  const ly=document.getElementById('f-ly');
-  (F.lease_years||[]).slice().sort((a,b)=>b-a).forEach(y=>{ const o=document.createElement('option'); o.value=String(y); o.textContent='до '+y; ly.appendChild(o); });
   const dl=document.getElementById('renters-dl');
   (F.renters||[]).forEach(r=>{ const o=document.createElement('option'); o.value=r; dl.appendChild(o); });
   RENTC=F.renter_councils||{}; RENTERS=F.renters||[];
