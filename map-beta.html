@@ -78,6 +78,20 @@
 const OWN = { p:['Частная','#2ecc71'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#ff6f61'] };
 // Границы всей Херсонской области (по экстенту 337 советов + небольшой запас) — стартовый кадр на весь экран
 const KHERSON_BOUNDS = [[31.80, 45.90], [35.10, 47.45]];   // [[з,ю],[в,с]]
+// Тайлы .pbf пожаты gzip-ом (×3 по сети). GitHub Pages не ставит Content-Encoding → MapLibre сам не разжимает, поэтому протокол gz:// распаковывает на клиенте (нативный DecompressionStream). Не-сжатые .pbf тоже работают (проверка по сигнатуре 1f 8b).
+if (maplibregl.addProtocol) {
+  maplibregl.addProtocol('gz', async (params, abortController) => {
+    const signal = abortController && abortController.signal;
+    const resp = await fetch(params.url.replace(/^gz:\/\//, ''), signal ? { signal } : undefined);
+    if (!resp.ok) throw new Error('tile ' + resp.status);
+    const buf = await resp.arrayBuffer();
+    const b = new Uint8Array(buf);
+    const data = (b.length >= 2 && b[0] === 0x1f && b[1] === 0x8b && window.DecompressionStream)
+      ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+      : buf;
+    return { data };
+  });
+}
 const map = new maplibregl.Map({
   container: 'map',
   attributionControl: false,
@@ -93,7 +107,7 @@ const map = new maplibregl.Map({
       base: { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png'], tileSize:256 },
       sat: { type:'raster', tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize:256, maxzoom:19 },
       omt: { type:'vector', url:'https://tiles.openfreemap.org/planet', attribution:'© OpenMapTiles' },
-      parcels: { type:'vector', tiles:[location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:6, maxzoom:14 }
+      parcels: { type:'vector', tiles:['gz://' + location.origin + location.pathname.replace(/[^/]*$/, '') + 'tiles/{z}/{x}/{y}.pbf'], minzoom:6, maxzoom:14 }
     },
     layers: [
       { id:'light', type:'raster', source:'light', layout:{visibility:'none'} },

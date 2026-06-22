@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Перегенерация векторных тайлов всех участков -> tiles/{z}/{x}/{y}.pbf
 # Запускать при изменении parcels/ или councils/. Требует: tippecanoe (brew install tippecanoe), python3.
-# Тайлы: zoom 8-14 (выше — overzoom на клиенте), без сжатия (GitHub Pages отдаёт raw .pbf).
+# Тайлы: zoom 6-14 (выше — overzoom на клиенте), gzip-сжатые (×3 по сети).
+# GitHub Pages не ставит Content-Encoding → оригинал распаковывает сам (DecompressionStream в index.html), бета (MapLibre) разжимает gzip нативно.
 # Свойство только o = форма собственности (p/k/g/n) для раскраски; кадастр/площадь/данные участка
 # берутся при клике из оригинальных parcels/*.geojson + councils/*.json (point-in-polygon), не из тайлов.
 # Лимит тайла 2 МБ + только o => с z9 и выше участки НЕ прореживаются (карта залита на обзоре).
@@ -29,5 +30,5 @@ PY
 rm -rf tiles
 tippecanoe -e tiles -l parcels -P -Z6 -z14 -y o \
   --drop-densest-as-needed --maximum-tile-bytes 2000000 \
-  --no-tile-compression --force --name="Kherson parcels" "$TMP"
+  --force --name="Kherson parcels" "$TMP"   # без --no-tile-compression → .pbf gzip-сжаты
 echo "tiles: $(find tiles -name '*.pbf' | wc -l | tr -d ' ') files, $(du -sh tiles | cut -f1)"
