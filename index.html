@@ -396,6 +396,7 @@
   const origInit = L.Canvas.Tile.prototype.initialize;
   L.Canvas.Tile.prototype.initialize = function (tileCoord, tileSize, options) {
     origInit.call(this, tileCoord, tileSize, options);
+    if (!this._tileCoord || this._tileCoord.z < 10) return;   // обзор (z<10) — 1x (быстрее рендер, участки всё равно мелкие); детальные тайлы — 2x (чётко)
     const c = this._container, s = this._size;
     c.width = s.x * dpr; c.height = s.y * dpr;
     c.style.width = s.x + 'px'; c.style.height = s.y + 'px';
@@ -2256,7 +2257,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v16';
+const BUILD_VERSION = 'v17';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
