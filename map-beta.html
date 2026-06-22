@@ -18,6 +18,9 @@
   #hud .leg.off{opacity:.4}
   #hud .sw{width:11px;height:11px;border-radius:2px;flex-shrink:0}
   #hud .back{display:inline-block;margin-bottom:7px;padding:3px 8px;border:1px solid #2a2f42;border-radius:5px}
+  #hud .bstat{font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:3px 0 5px;display:flex;flex-wrap:wrap;gap:2px 10px}
+  #hud .bstat span{white-space:nowrap}
+  #hud .bstat b{color:#cdd2e0;font-weight:600}
   .maplibregl-popup-content{background:#181c27;color:#e8e8ea;border:1px solid #2a2f42;font-size:12px}
   .maplibregl-popup-tip{border-top-color:#181c27!important;border-bottom-color:#181c27!important}
   #zoomctl{position:absolute;right:10px;bottom:28px;z-index:5;display:flex;flex-direction:column;gap:2px}
@@ -50,9 +53,9 @@
 <div id="hud">
   <a class="back" href="index.html">← Основная карта</a>
   <div><b>Бета-карта</b> · MapLibre GL (GPU)</div>
-  <div style="font-family:ui-monospace,monospace;font-size:10px;color:#8b91a8;margin:2px 0 3px">554 130 уч · 1 975 487 га · 336 сёл · 20 р-нов · 2 412 разм.</div>
+  <div class="bstat"><span><b>613 471</b> уч</span><span><b>2 162 361</b> га</span><span><b>326</b> сёл</span><span><b>20</b> р-нов</span><span><b>2 410</b> разм.</span></div>
   <div style="margin:4px 0"><button class="bt" data-b="light">Светлая</button><button class="bt on" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
-  <div>Все ~530к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
+  <div>Все ~613к участков, плавно на любом зуме. Галочками — показать/скрыть форму собственности. Клик — данные участка; Shift+клик / Shift+рамка — в подборку.</div>
   <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#2ecc71"></span>Частная</label>
   <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
   <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
