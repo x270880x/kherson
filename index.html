@@ -999,13 +999,37 @@ async function rawParcels(code) {
   }
   return rawParcelsCache[code];
 }
+// Ближайшие к точке советы (для клика/наведения по тайлам — геометрию участков ищем у них)
+function nearCouncils(x, y) {
+  return COUNCILS.filter(c => c.lat && Math.abs(c.lat - y) < 0.25 && Math.abs(c.lon - x) < 0.3)
+    .sort((a, b) => ((a.lat - y) ** 2 + (a.lon - x) ** 2) - ((b.lat - y) ** 2 + (b.lon - x) ** 2)).slice(0, 4);
+}
+function featBBox(f) {   // bbox участка (кэшируется на фиче) — быстрый отсев перед point-in-polygon
+  if (f.__bb !== undefined) return f.__bb;
+  const g = f.geometry; if (!g) return (f.__bb = null);
+  let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
+  const scan = rings => rings.forEach(r => r.forEach(p => { if (p[0] < a) a = p[0]; if (p[0] > c) c = p[0]; if (p[1] < b) b = p[1]; if (p[1] > d) d = p[1]; }));
+  if (g.type === 'Polygon') scan(g.coordinates); else if (g.type === 'MultiPolygon') g.coordinates.forEach(scan); else return (f.__bb = null);
+  return (f.__bb = [a, b, c, d]);
+}
+// Найти участок под точкой ТОЛЬКО по уже загруженной геометрии (для наведения — без сетевых ожиданий)
+function findParcelCached(x, y) {
+  for (const c of nearCouncils(x, y)) {
+    const feats = rawParcelsCache[c.code];
+    if (!feats) continue;
+    for (const f of feats) {
+      const bb = featBBox(f);
+      if (!bb || x < bb[0] || x > bb[2] || y < bb[1] || y > bb[3]) continue;
+      if (geomContains(f.geometry, x, y)) return { feature: f, council: c };
+    }
+  }
+  return null;
+}
 map.on('click', async e => {
   if (!fullMapMode && ownMode !== 'all') return;
   if (ownMode === 'all' && map.getZoom() < 12.5) return;   // «Вся карта»: клик по участку только с z12.5 (ниже — статичный цветной слой)
   const x = e.latlng.lng, y = e.latlng.lat;
-  const near = COUNCILS.filter(c => c.lat && Math.abs(c.lat - y) < 0.25 && Math.abs(c.lon - x) < 0.3)
-    .sort((a, b) => ((a.lat - y) ** 2 + (a.lon - x) ** 2) - ((b.lat - y) ** 2 + (b.lon - x) ** 2)).slice(0, 4);
-  for (const c of near) {
+  for (const c of nearCouncils(x, y)) {
     const feats = await rawParcels(c.code);
     const hit = feats.find(f => f.geometry && geomContains(f.geometry, x, y));
     if (hit) {
@@ -1018,6 +1042,58 @@ map.on('click', async e => {
     }
   }
 });
+// ===== Тайловый режим: наведение на участок (белый ободок) + ободки подборки (point-in-polygon) =====
+function tileParcelsMode() { return fullMapMode || ownMode === 'all'; }
+function tileHoverActive() { return tileParcelsMode() && map.getZoom() >= 12.5; }   // как порог клика по участку
+let hoverParcelLayer = null, hoverParcelCad = null;
+function setHoverParcel(hit) {
+  const cad = hit ? hit.feature.properties.cadnum : null;
+  if (cad === hoverParcelCad) return;                  // тот же участок — не перерисовываем
+  hoverParcelCad = cad;
+  if (hoverParcelLayer) { map.removeLayer(hoverParcelLayer); hoverParcelLayer = null; }
+  if (hit) hoverParcelLayer = L.geoJSON(hit.feature, { interactive: false, style: { color: '#fff', weight: 2, fill: false } }).addTo(map);
+  map.getContainer().style.cursor = hit ? 'pointer' : '';
+}
+let _hoverQueued = false, _hoverLL = null;
+map.on('mousemove', e => {
+  if (!tileHoverActive() || (e.originalEvent && (e.originalEvent.shiftKey || e.originalEvent.buttons))) { if (hoverParcelCad) setHoverParcel(null); return; }
+  _hoverLL = e.latlng;
+  if (_hoverQueued) return;                             // не чаще кадра
+  _hoverQueued = true;
+  requestAnimationFrame(() => {
+    _hoverQueued = false;
+    if (!tileHoverActive() || !_hoverLL) { setHoverParcel(null); return; }
+    const x = _hoverLL.lng, y = _hoverLL.lat;
+    nearCouncils(x, y).forEach(c => { if (!rawParcelsCache[c.code]) rawParcels(c.code); });   // прогрев геометрии под курсором
+    setHoverParcel(findParcelCached(x, y));
+  });
+});
+map.on('mouseout', () => setHoverParcel(null));
+map.on('zoomend', () => { if (!tileHoverActive()) setHoverParcel(null); });
+
+const basketOverlay = L.layerGroup();                  // ободки подборки в тайловом режиме (в «По сёлам» их рисуют сами полигоны)
+const basketOverlayByCad = {};
+function syncBasketOverlay() {
+  for (const cad in basketOverlayByCad) {              // снять выбывшие из подборки
+    if (!basket.has(cad)) { basketOverlay.removeLayer(basketOverlayByCad[cad]); delete basketOverlayByCad[cad]; }
+  }
+  if (!tileParcelsMode()) { if (map.hasLayer(basketOverlay)) map.removeLayer(basketOverlay); return; }
+  if (!map.hasLayer(basketOverlay)) basketOverlay.addTo(map);
+  const byCouncil = {};                                // недостающие — по советам, геометрию подгрузить
+  for (const cad of basket) if (!basketOverlayByCad[cad]) (byCouncil[cad.slice(0, 10)] ||= []).push(cad);
+  for (const code in byCouncil) {
+    rawParcels(code).then(feats => {
+      const want = new Set(byCouncil[code]);
+      feats.forEach(f => {
+        const cad = f.properties.cadnum;
+        if (want.has(cad) && basket.has(cad) && !basketOverlayByCad[cad]) {
+          const lyr = L.geoJSON(f, { interactive: false, style: { color: '#ff0', weight: 3, fill: true, fillColor: '#ff0', fillOpacity: 0.35 } });
+          basketOverlayByCad[cad] = lyr; lyr.addTo(basketOverlay);
+        }
+      });
+    });
+  }
+}
 function enableFullMap() {
   fullMapMode = true;
   if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);          // убрать кружки-маркеры
@@ -1026,12 +1102,15 @@ function enableFullMap() {
   syncParcelTiles();
   labelsUpdate();
   applyBasemapLabels();
+  syncBasketOverlay();
 }
 function disableFullMap() {
   fullMapMode = false;
   syncParcelTiles();   // убрать тайлы только если не активна «Вся карта»
   labelsUpdate();      // подписи останутся, если активна «Вся карта»; иначе очистятся
   applyBasemapLabels();
+  setHoverParcel(null);
+  syncBasketOverlay();
   if (!labelsActive() && !map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки
 }
 map.on('overlayadd', e => { if (e.layer === fullMapLayer) enableFullMap(); });
@@ -1213,6 +1292,7 @@ function setOwnMode(mode) {
   }
   applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
   syncRazmezh();          // межевание видно по умолчанию в «Вся карта»
+  setHoverParcel(null); syncBasketOverlay();   // ободки наведения/подборки — под текущий режим
   applyOwnModeUI();
 }
 
@@ -1763,6 +1843,7 @@ function basketUpdate() {
       }
     });
   }
+  syncBasketOverlay();   // тайловый режим («Вся карта»): ободки участков подборки
   if (basket.size > 0 || basketView) renderBasketPanel();
 }
 function basketToggle(cadnum) {
@@ -1796,24 +1877,34 @@ function toggleBasketBtn(btn, cadnum) {
       rect.setBounds(L.latLngBounds(start, e.latlng));
     }
   });
-  map.on('mouseup', () => {
-    if (start && dragging && rect) {
-      const b = rect.getBounds();
-      let added = 0;
-      for (const code in polygonLayers) {
-        const layer = polygonLayers[code];
-        if (!map.hasLayer(layer)) continue;
-        layer.eachLayer(l => {
-          if (l.feature && b.contains(l.getBounds().getCenter()) && !basket.has(l.feature.properties.cadnum)) {
-            basket.add(l.feature.properties.cadnum); added++;
-          }
+  map.on('mouseup', async () => {
+    if (!(start && dragging && rect)) { start = null; dragging = false; rect = null; return; }
+    const b = rect.getBounds();
+    map.removeLayer(rect);
+    map.dragging.enable();
+    start = null; dragging = false; rect = null;   // сброс до async-работы
+    let added = 0;
+    for (const code in polygonLayers) {            // «По сёлам» — по загруженным полигонам
+      const layer = polygonLayers[code];
+      if (!map.hasLayer(layer)) continue;
+      layer.eachLayer(l => {
+        if (l.feature && b.contains(l.getBounds().getCenter()) && !basket.has(l.feature.properties.cadnum)) {
+          basket.add(l.feature.properties.cadnum); added++;
+        }
+      });
+    }
+    if (tileParcelsMode() && map.getZoom() >= 12.5) {   // «Вся карта» — подгрузить советы в рамке, добавить участки с центром внутри
+      const pad = b.pad(0.3);
+      for (const c of COUNCILS.filter(c => c.lat && pad.contains([c.lat, c.lon]))) {
+        const feats = await rawParcels(c.code);
+        feats.forEach(f => {
+          const bb = featBBox(f); if (!bb) return;
+          const ctr = [(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2];
+          if (b.contains(ctr) && !basket.has(f.properties.cadnum)) { basket.add(f.properties.cadnum); added++; }
         });
       }
-      map.removeLayer(rect);
-      map.dragging.enable();
-      basketUpdate();
     }
-    start = null; dragging = false; rect = null;
+    basketUpdate();
   });
 })();
 document.getElementById('btn-basket-add').addEventListener('click', () => {
@@ -2122,7 +2213,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v4';
+const BUILD_VERSION = 'v5';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
