@@ -58,10 +58,10 @@
   <div style="margin:5px 0 6px"><button class="bt" data-b="light">Светлая</button><button class="bt on" data-b="dark">Тёмная</button><button class="bt" data-b="sat">Спутник</button></div>
   <div class="bstat"><span><b>613 471</b> уч</span><span><b>2 162 361</b> га</span><span><b>326</b> сёл</span><span><b>20</b> р-нов</span><span><b>2 410</b> разм.</span></div>
   <div style="color:#8b91a8;margin:6px 0 3px">Форма собственности:</div>
-  <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#2ecc71"></span>Частная</label>
-  <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#e8c547"></span>Коммунальная</label>
-  <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#4a9eff"></span>Государственная</label>
-  <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#ff6f61"></span>Не определено</label>
+  <label class="leg" data-o="p"><input type="checkbox" checked><span class="sw" style="background:#27ad60"></span>Частная</label>
+  <label class="leg" data-o="k"><input type="checkbox" checked><span class="sw" style="background:#c5a73c"></span>Коммунальная</label>
+  <label class="leg" data-o="g"><input type="checkbox" checked><span class="sw" style="background:#3f86d9"></span>Государственная</label>
+  <label class="leg" data-o="n"><input type="checkbox" checked><span class="sw" style="background:#d95e52"></span>Не определено</label>
   <div style="margin-top:8px;border-top:1px solid #20242f;padding-top:7px">
     <span style="color:#8b91a8">Категория земель:</span>
     <select id="f-ct"><option value="">все</option></select>
@@ -79,7 +79,7 @@
 <div id="basket">📌 <b id="bk-count">0</b> уч. <button id="bk-exp">CSV</button><button id="bk-clr">Очистить</button></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
-const OWN = { p:['Частная','#2ecc71'], k:['Коммунальная','#e8c547'], g:['Государственная','#4a9eff'], n:['Не определено','#ff6f61'] };
+const OWN = { p:['Частная','#27ad60'], k:['Коммунальная','#c5a73c'], g:['Государственная','#3f86d9'], n:['Не определено','#d95e52'] };
 // Границы всей Херсонской области (по экстенту 337 советов + небольшой запас) — стартовый кадр на весь экран
 const KHERSON_BOUNDS = [[31.80, 45.90], [35.10, 47.45]];   // [[з,ю],[в,с]]
 // Тайлы .pbf пожаты gzip-ом (×3 по сети). GitHub Pages не ставит Content-Encoding → MapLibre сам не разжимает, поэтому протокол gz:// распаковывает на клиенте (нативный DecompressionStream). Не-сжатые .pbf тоже работают (проверка по сигнатуре 1f 8b).
@@ -272,7 +272,7 @@ const raionOf=code=>RAION_BY_PREFIX[(code||'').slice(2,5)]||'';
 let CAT_RU={};   // перевод «Назначение» укр→рус (фильтр — укр, попап — рус)
 fetch(BASE+'categories-ru.json').then(r=>r.json()).then(d=>{CAT_RU=d;}).catch(()=>{});
 const catRu=ct=>CAT_RU[ct]||ct||'';
-const OTC={'Приватна власність':['Частная собственность','#2ecc71'],'Комунальна власність':['Коммунальная собственность','#e8c547'],'Державна власність':['Государственная собственность','#4a9eff'],'Не визначено':['Не определено','#ff6f61']};
+const OTC={'Приватна власність':['Частная собственность','#27ad60'],'Комунальна власність':['Коммунальная собственность','#c5a73c'],'Державна власність':['Государственная собственность','#3f86d9'],'Не визначено':['Не определено','#d95e52']};
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 // Копирование кадастрового номера из попапа (как на основной карте)
 function fallbackCopy(text, ok){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); ok(); }catch(e){} document.body.removeChild(ta); }
@@ -488,7 +488,7 @@ function basketToggle(cad, geom, rec, cname){
   if(basket.has(cad)) basket.delete(cad); else basket.set(cad,{geom,rec,cname});
   basketRefresh();
 }
-const OWN_COLOR_EXPR=['match',['get','o'],'p','#2ecc71','k','#e8c547','g','#4a9eff','n','#ff6f61','#888888'];
+const OWN_COLOR_EXPR=['match',['get','o'],'p','#27ad60','k','#c5a73c','g','#3f86d9','n','#d95e52','#747474'];   // −15% яркости (RGB×0.85) — заливка участков
 const EMPTY={type:'FeatureCollection',features:[]};
 // Слой участков добавляем отложенно — подложка успевает прорисоваться, тяжёлые .pbf не блокируют первый кадр
 let parcelsAdded=false;
