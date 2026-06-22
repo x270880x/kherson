@@ -1097,6 +1097,31 @@ function syncBasketOverlay() {
     });
   }
 }
+// ===== Высокий зум: чёткие контуры участков из настоящей геометрии (тайлы — до z14, выше overzoom даёт «лесенку» на гранях) =====
+const HI_ZOOM = 15;
+let hiOutlineLayer = null;
+function clearHiOutlines() { if (hiOutlineLayer) { map.removeLayer(hiOutlineLayer); hiOutlineLayer = null; } }
+function syncHiZoomOutlines() {
+  if (!tileParcelsMode() || map.getZoom() < HI_ZOOM) { clearHiOutlines(); return; }
+  const b = map.getBounds(), W = b.getWest(), S = b.getSouth(), E = b.getEast(), N = b.getNorth();
+  const set = new Map();   // советы вокруг кадра (центр+углы → ближайшие)
+  [b.getCenter(), b.getNorthWest(), b.getNorthEast(), b.getSouthWest(), b.getSouthEast()]
+    .forEach(p => nearCouncils(p.lng, p.lat).forEach(c => set.set(c.code, c)));
+  const feats = []; let pending = false;
+  for (const c of set.values()) {
+    const fs = rawParcelsCache[c.code];
+    if (!fs) { rawParcels(c.code); pending = true; continue; }   // подгрузить, перерисуем по таймеру
+    for (const f of fs) {
+      const bb = featBBox(f); if (!bb) continue;
+      if (bb[2] < W || bb[0] > E || bb[3] < S || bb[1] > N) continue;   // не в кадре
+      feats.push(f);
+    }
+  }
+  clearHiOutlines();
+  if (feats.length) hiOutlineLayer = L.geoJSON({ type: 'FeatureCollection', features: feats },
+    { interactive: false, style: { color: '#0c0c0c', weight: 0.9, fill: false } }).addTo(map);
+  if (pending) setTimeout(syncHiZoomOutlines, 250);
+}
 function enableFullMap() {
   fullMapMode = true;
   if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);          // убрать кружки-маркеры
@@ -1106,6 +1131,7 @@ function enableFullMap() {
   labelsUpdate();
   applyBasemapLabels();
   syncBasketOverlay();
+  syncHiZoomOutlines();
 }
 function disableFullMap() {
   fullMapMode = false;
@@ -1114,11 +1140,12 @@ function disableFullMap() {
   applyBasemapLabels();
   setHoverParcel(null);
   syncBasketOverlay();
+  syncHiZoomOutlines();
   if (!labelsActive() && !map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки
 }
 map.on('overlayadd', e => { if (e.layer === fullMapLayer) enableFullMap(); });
 map.on('overlayremove', e => { if (e.layer === fullMapLayer) disableFullMap(); });
-map.on('moveend zoomend', () => { if (labelsActive()) labelsUpdate(); });
+map.on('moveend zoomend', () => { if (labelsActive()) labelsUpdate(); syncHiZoomOutlines(); });
 
 let markers = {};
 let activeCode = null;
@@ -1295,7 +1322,7 @@ function setOwnMode(mode) {
   }
   applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
   syncRazmezh();          // межевание видно по умолчанию в «Вся карта»
-  setHoverParcel(null); syncBasketOverlay();   // ободки наведения/подборки — под текущий режим
+  setHoverParcel(null); syncBasketOverlay(); syncHiZoomOutlines();   // ободки/контуры — под текущий режим
   applyOwnModeUI();
 }
 
@@ -1896,9 +1923,11 @@ function toggleBasketBtn(btn, cadnum) {
         }
       });
     }
-    if (tileParcelsMode() && map.getZoom() >= 12.5) {   // «Вся карта» — подгрузить советы в рамке, добавить участки с центром внутри
-      const pad = b.pad(0.3);
-      for (const c of COUNCILS.filter(c => c.lat && pad.contains([c.lat, c.lon]))) {
+    if (tileParcelsMode() && map.getZoom() >= 12.5) {   // «Вся карта» — советы вокруг рамки (по центру села nearCouncils), участки с центром внутри
+      const set = new Map();   // центр + 4 угла рамки → ближайшие советы (центр села обычно рядом с его участками)
+      [b.getCenter(), b.getNorthWest(), b.getNorthEast(), b.getSouthWest(), b.getSouthEast()]
+        .forEach(p => nearCouncils(p.lng, p.lat).forEach(c => set.set(c.code, c)));
+      for (const c of set.values()) {
         const feats = await rawParcels(c.code);
         feats.forEach(f => {
           const bb = featBBox(f); if (!bb) return;
