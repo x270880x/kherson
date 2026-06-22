@@ -912,20 +912,25 @@ function showRaionTable(p) { const rname = RAION_BY_PREFIX[p.rpfx]; if (rname) s
 // Наведение в ОБЛАСТЬ НП на ЛЮБОМ зуме: по карте ищем ближайший НП и показываем его табличку у курсора (не только на подписи)
 function nearestCouncil(lng, lat) { let best = null, bd = 1e9; for (const c of CIDX) { const d = (c.lat - lat) ** 2 + (c.lon - lng) ** 2; if (d < bd) { bd = d; best = c; } } return { best, bd }; }
 let lastHoverCode = '';
-function mapAreaHover(latlng) {
-  // ближайший НП СРЕДИ ВИДИМЫХ подписей (labelByCode); для НП без подписи попап не показываем
+function mapAreaHover(latlng, ev) {
+  // ближайший НП СРЕДИ ВИДИМЫХ подписей (labelByCode)
   let best = null, bd = 1e9;
   for (const p of LABEL_PTS) {
-    if (!labelByCode[p.c]) continue;
+    if (!labelByCode[p.c] || !p.o) continue;
     const d = (p.lat - latlng.lat) ** 2 + (p.lon - latlng.lng) ** 2;
     if (d < bd) { bd = d; best = p; }
   }
-  if (!best || bd > 0.06 || !best.o) { clearHover(); lastHoverCode = ''; return; }   // нет видимого НП рядом — скрыть
-  if (hoverPop) {                         // переиспользуем попап: двигаем за курсором, содержимое — только при смене НП (без дёрганья/двойных попапов)
+  // попап ТОЛЬКО если курсор над самой подписью + ~2мм по кругу (а не в широком радиусе)
+  const el = best && labelByCode[best.c] && labelByCode[best.c].getElement();
+  if (!el || !ev) { clearHover(); lastHoverCode = ''; return; }
+  const r = el.getBoundingClientRect(), M = 8;   // ~2мм запас вокруг подписи
+  if (ev.clientX < r.left - M || ev.clientX > r.right + M || ev.clientY < r.top - M || ev.clientY > r.bottom + M) {
+    clearHover(); lastHoverCode = ''; return;     // дальше 2мм от подписи — без попапа
+  }
+  if (hoverPop && best.c === lastHoverCode) {     // переиспользуем: двигаем за курсором, без дёрганья
     hoverPop.setLatLng(latlng);
-    if (best.c !== lastHoverCode) hoverPop.setContent(ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.c.slice(2, 5) }));
   } else {
-    showTable(latlng, ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.c.slice(2, 5) }));
+    showTable(latlng, ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.rpfx }));
   }
   lastHoverCode = best.c;
 }
@@ -934,7 +939,7 @@ map.on('mousemove', e => {
   if (e.originalEvent && e.originalEvent.shiftKey) return;      // не мешать Shift-рамке подборки
   const t = e.originalEvent && e.originalEvent.target;
   if (t && t.closest && t.closest('.leaflet-tooltip.council-label')) return;   // над подписью — её собственный hover (центр→район, село→совет)
-  mapAreaHover(e.latlng);
+  mapAreaHover(e.latlng, e.originalEvent);
 });
 // mouseleave контейнера (НЕ map 'mouseout', который срабатывает при заходе на подпись и гасил табличку)
 map.getContainer().addEventListener('mouseleave', () => { clearHover(); lastHoverCode = ''; });
@@ -2254,7 +2259,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v7';
+const BUILD_VERSION = 'v8';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
