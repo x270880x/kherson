@@ -857,28 +857,7 @@ fetch('councils-index.json').then(r => r.json())
   .catch(() => { CIDX = COUNCILS.map(councilToCidx); })   // офлайн-фоллбэк: те же советы из встроенных данных
   .then(() => { buildLabelPts(); if (labelsActive()) labelsUpdate(); });
 
-// ── Навигация по клику: drill по селу (4 → z12.5 → 1) и весь район по клику на центр ──
-function nearestCouncil(lng, lat) { let best = null, bd = 1e9; for (const c of CIDX) { const d = (c.lat - lat) ** 2 + (c.lon - lng) ** 2; if (d < bd) { bd = d; best = c; } } return best; }
-function fitNearestN(lng, lat, n) {   // кадрируем ~n ближайших НП, кликнутый строго в центре (симметричная рамка), не отдаляя; maxZoom 14
-  const near = CIDX.filter(c => c.lat && c.lon).map(c => ({ c, d: (c.lat - lat) ** 2 + (c.lon - lng) ** 2 })).sort((a, b) => a.d - b.d).slice(0, n).map(o => o.c);
-  if (!near.length) { map.flyTo([lat, lng], map.getZoom(), { duration: 0.7 }); return; }
-  const rLat = Math.max(...near.map(c => Math.abs(c.lat - lat))), rLon = Math.max(...near.map(c => Math.abs(c.lon - lng)));
-  const box = L.latLngBounds([lat - rLat - 0.01, lng - rLon - 0.01], [lat + rLat + 0.01, lng + rLon + 0.01]);
-  let z = Math.min(map.getBoundsZoom(box, false, L.point(40, 40)), 14);
-  z = Math.max(z, map.getZoom());
-  map.flyTo([lat, lng], z, { duration: 0.7 });
-}
-function drillVillage(lng, lat) { fitNearestN(lng, lat, 4); }   // клик по селу/пгт → село + 3 ближайших (не больше)
-function raionZoom(p) {   // клик по райцентру → весь район в кадре (как centers-hit в бете)
-  const rname = RAION_BY_PREFIX[p.rpfx] || '';
-  const rc = (rname ? CIDX.filter(c => raionOf(c.c) === rname) : []).filter(c => c.lat && c.lon);
-  if (rc.length) {
-    const las = rc.map(c => c.lat), los = rc.map(c => c.lon);
-    map.fitBounds([[Math.min(...las) - 0.05, Math.min(...los) - 0.05], [Math.max(...las) + 0.05, Math.max(...los) + 0.05]], { padding: [22, 22], duration: 1.6 });
-    return;
-  }
-  map.flyTo([p.lat, p.lon], 9, { duration: 1.6 });
-}
+// ── Навигация по клику в «Вся карта»: клик по зоне НП (подписи) → зум-ин на 1 уровень за клик, центр на НП (см. makeLabel) ──
 
 // ── Наведение → табличка форм собственности: для центра по ВСЕМУ району, для села по совету ──
 let hoverPop = null;
@@ -913,8 +892,7 @@ function makeLabel(p) {
     el.addEventListener('click', ev => {
       ev.stopPropagation();
       clearHover();
-      if (center) raionZoom(p);            // центр → весь район
-      else drillVillage(p.lon, p.lat);     // село → прогрессивный drill (4 → z12.5 → 1)
+      map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 });   // зум-ин на 1 уровень за клик, центр — НП (только «Вся карта»)
     });
   }
   return tip;
