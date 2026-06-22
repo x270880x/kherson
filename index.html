@@ -926,9 +926,12 @@ function mapAreaHover(latlng) {
 map.on('mousemove', e => {
   if (!labelsActive() || !CIDX.length) return;                 // только в «Вся карта»
   if (e.originalEvent && e.originalEvent.shiftKey) return;      // не мешать Shift-рамке подборки
+  const t = e.originalEvent && e.originalEvent.target;
+  if (t && t.closest && t.closest('.leaflet-tooltip.council-label')) return;   // над подписью — её собственный hover (центр→район, село→совет)
   mapAreaHover(e.latlng);
 });
-map.on('mouseout', () => { clearHover(); lastHoverCode = ''; });
+// mouseleave контейнера (НЕ map 'mouseout', который срабатывает при заходе на подпись и гасил табличку)
+map.getContainer().addEventListener('mouseleave', () => { clearHover(); lastHoverCode = ''; });
 
 function makeLabel(p) {
   const center = isCenter(p);
@@ -2213,7 +2216,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v5';
+const BUILD_VERSION = 'v6';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
