@@ -872,7 +872,8 @@ function abbrLabel(name) {
   if (sp > 0 && LABEL_QUALIFIERS.has(rest.slice(0, sp))) return pre + rest[0] + '. ' + rest.slice(sp + 1);
   return name;
 }
-let CIDX = [];            // councils-index.json: {c,n,lat,lon,total,ha,o:{p,k,g,n}} — тот же набор, что у беты
+let CIDX = [];            // councils-index.json: {c,n,lat,lon,total,ha,o:{p,k,g,n},bb} — тот же набор, что у беты
+let BB_BY_CODE = {};      // code → [W,S,E,N] bbox участков совета (обрезанный) — кандидаты для клика/наведения, учитывает раскиданные участки
 let LABEL_PTS = [];       // вычисленные точки подписей (как feats в бете)
 let OBLAST_BOUNDS = null; // bbox всех точек — для динамического порога появления сёл
 const isCenter = p => p.ctr || p.big || p.capital;
@@ -904,7 +905,7 @@ function buildLabelPts() {
 fetch('councils-index.json').then(r => r.json())
   .then(d => { CIDX = d; })
   .catch(() => { CIDX = COUNCILS.map(councilToCidx); })   // офлайн-фоллбэк: те же советы из встроенных данных
-  .then(() => { buildLabelPts(); if (labelsActive()) labelsUpdate(); });
+  .then(() => { for (const c of CIDX) if (c.bb) BB_BY_CODE[c.c] = c.bb; buildLabelPts(); if (labelsActive()) labelsUpdate(); });
 
 // ── Навигация по клику в «Вся карта» (всё строго по центру НП) ──
 const NP_ZOOM_1 = 11.5, NP_ZOOM_2 = 13.0, NP_ZOOM_3 = 14.0, NP_ZOOM_4 = 14.5;   // 1-й/2-й/3-й/4-й клик, на экране ~1440px
@@ -1047,8 +1048,15 @@ function rawParcels(code) {
 }
 // Ближайшие к точке советы (для клика/наведения по тайлам — геометрию участков ищем у них)
 function nearCouncils(x, y) {
-  return COUNCILS.filter(c => c.lat && Math.abs(c.lat - y) < 0.25 && Math.abs(c.lon - x) < 0.3)
-    .sort((a, b) => ((a.lat - y) ** 2 + (a.lon - x) ** 2) - ((b.lat - y) ** 2 + (b.lon - x) ** 2)).slice(0, 4);
+  const dist = c => (c.lat - y) ** 2 + (c.lon - x) ** 2;
+  const M = 0.012;   // ~1 км запас (участок у края bbox)
+  // советы, чей bbox участков накрывает точку — ловит раскиданные/далёкие от центра села участки (даже если центр в стороне)
+  const hits = COUNCILS.filter(c => { const b = BB_BY_CODE[c.code]; return b && x >= b[0] - M && x <= b[2] + M && y >= b[1] - M && y <= b[3] + M; }).sort((a, b) => dist(a) - dist(b));
+  // + 4 ближайших по центру (фолбэк, пока bbox не загружен / для краёв)
+  const near = COUNCILS.filter(c => c.lat && Math.abs(c.lat - y) < 0.25 && Math.abs(c.lon - x) < 0.3).sort((a, b) => dist(a) - dist(b)).slice(0, 4);
+  const seen = new Set(), out = [];
+  for (const c of hits.concat(near)) if (!seen.has(c.code)) { seen.add(c.code); out.push(c); }
+  return out;
 }
 function featBBox(f) {   // bbox участка (кэшируется на фиче) — быстрый отсев перед point-in-polygon
   if (f.__bb !== undefined) return f.__bb;
@@ -1110,7 +1118,7 @@ map.on('mousemove', e => {
     _hoverQueued = false;
     if (!tileHoverActive() || !_hoverLL) { setHoverParcel(null); return; }
     const x = _hoverLL.lng, y = _hoverLL.lat;
-    const nc = nearCouncils(x, y); for (let i = 0; i < 2 && i < nc.length; i++) if (!rawParcelsCache[nc[i].code]) rawParcels(nc[i].code);   // греем только 2 ближайших (не пачку)
+    const nc = nearCouncils(x, y); for (let i = 0; i < 3 && i < nc.length; i++) if (!rawParcelsCache[nc[i].code]) rawParcels(nc[i].code);   // греем 3 ближайших (bbox-владелец в начале списка)
     setHoverParcel(findParcelCached(x, y));
   });
 });
@@ -2286,7 +2294,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v18';
+const BUILD_VERSION = 'v19';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
