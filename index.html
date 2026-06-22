@@ -1169,6 +1169,7 @@ function applyOwnModeUI() {
 function setOwnMode(mode) {
   if (mode === ownMode) return;
   ownMode = mode;
+  try { localStorage.setItem('kherson_mode', mode); } catch (e) {}   // запомнить плашку — восстановим при следующем заходе
   filterOwnership = new Set();
   if (mode === 'all') {
     allMapVisible.clear(); ['p','k','g','n'].forEach(s => allMapVisible.add(s));   // со старта все формы (вкл. частную)
@@ -2086,16 +2087,21 @@ map.on('click', () => asideLeft.classList.remove('open'));
 buildMarkers();
 
 // Старт: ?z=/?zoom= — сразу «Вся карта» на заданном зуме; иначе «По сёлам» с тем же обзором, привязанным к экрану
+const SAVED_MODE = (function () { try { return localStorage.getItem('kherson_mode'); } catch (e) { return null; } })();
 if (isFinite(Z_PARAM) && Z_PARAM > 0) {
   setOwnMode('all');
   map.stop();
   map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: false });
+} else if (SAVED_MODE === 'all') {
+  setOwnMode('all');   // восстановить последнюю открытую плашку «Вся карта»
+  map.stop();
+  flyOverview(false);  // мгновенный обзор (без анимации на старте)
 } else {
-  flyOverview(false);   // мгновенный обзор «как при z9», вписанный в экран
+  flyOverview(false);  // «По сёлам» — обзор, привязанный к экрану
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v2';
+const BUILD_VERSION = 'v3';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
