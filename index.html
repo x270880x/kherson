@@ -868,16 +868,8 @@ function fitNearestN(lng, lat, n) {   // кадрируем ~n ближайши�
   z = Math.max(z, map.getZoom());
   map.flyTo([lat, lng], z, { duration: 0.7 });
 }
-let drillCode = '', drillN = 0; const DRILL_STEPS = [{ n: 4 }, { z: 12.5 }, { n: 1 }];
-function drillVillage(lng, lat) {
-  const nc = nearestCouncil(lng, lat), code = nc ? nc.c : '_';
-  if (code === drillCode) drillN = Math.min(drillN + 1, DRILL_STEPS.length - 1); else { drillCode = code; drillN = 0; }
-  const step = DRILL_STEPS[drillN];
-  if (step.z != null) map.flyTo([lat, lng], step.z, { duration: 0.7 });
-  else fitNearestN(lng, lat, step.n);
-}
+function drillVillage(lng, lat) { fitNearestN(lng, lat, 4); }   // клик по селу/пгт → село + 3 ближайших (не больше)
 function raionZoom(p) {   // клик по райцентру → весь район в кадре (как centers-hit в бете)
-  drillCode = '';   // сбрасываем прогрессию drill по сёлам
   const rname = RAION_BY_PREFIX[p.rpfx] || '';
   const rc = (rname ? CIDX.filter(c => raionOf(c.c) === rname) : []).filter(c => c.lat && c.lon);
   if (rc.length) {
