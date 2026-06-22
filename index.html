@@ -251,6 +251,8 @@
   .rt-hover-pop .leaflet-popup-content-wrapper { background: #fff; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
   .rt-hover-pop .leaflet-popup-content { margin: 7px 9px; }
   .rt-hover-pop .leaflet-popup-tip { background: #fff; }
+  /* Технический блок (зум + версия) — правый нижний угол */
+  #techinfo { position: fixed; right: 8px; bottom: 8px; z-index: 1200; pointer-events: none; font: 11px/1.2 'IBM Plex Mono', monospace; color: rgba(255,255,255,0.6); background: rgba(15,17,23,0.62); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 3px 7px; letter-spacing: .3px; white-space: nowrap; }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -2091,6 +2093,15 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 } else {
   flyOverview(false);   // мгновенный обзор «как при z9», вписанный в экран
 }
+
+// Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
+const BUILD_VERSION = 'v1';
+const techEl = document.createElement('div');
+techEl.id = 'techinfo';
+document.body.appendChild(techEl);
+function updateTechInfo() { techEl.textContent = 'z ' + map.getZoom().toFixed(2) + ' · ' + BUILD_VERSION; }
+map.on('zoom zoomend', updateTechInfo);
+updateTechInfo();
 </script>
 </body>
 </html>
