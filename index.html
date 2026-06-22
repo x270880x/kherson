@@ -913,8 +913,14 @@ function showRaionTable(p) { const rname = RAION_BY_PREFIX[p.rpfx]; if (rname) s
 function nearestCouncil(lng, lat) { let best = null, bd = 1e9; for (const c of CIDX) { const d = (c.lat - lat) ** 2 + (c.lon - lng) ** 2; if (d < bd) { bd = d; best = c; } } return { best, bd }; }
 let lastHoverCode = '';
 function mapAreaHover(latlng) {
-  const { best, bd } = nearestCouncil(latlng.lng, latlng.lat);
-  if (!best || bd > 0.06 || !best.o) { clearHover(); lastHoverCode = ''; return; }   // далеко от НП (море/край области) — скрыть
+  // ближайший НП СРЕДИ ВИДИМЫХ подписей (labelByCode); для НП без подписи попап не показываем
+  let best = null, bd = 1e9;
+  for (const p of LABEL_PTS) {
+    if (!labelByCode[p.c]) continue;
+    const d = (p.lat - latlng.lat) ** 2 + (p.lon - latlng.lng) ** 2;
+    if (d < bd) { bd = d; best = p; }
+  }
+  if (!best || bd > 0.06 || !best.o) { clearHover(); lastHoverCode = ''; return; }   // нет видимого НП рядом — скрыть
   if (hoverPop) {                         // переиспользуем попап: двигаем за курсором, содержимое — только при смене НП (без дёрганья/двойных попапов)
     hoverPop.setLatLng(latlng);
     if (best.c !== lastHoverCode) hoverPop.setContent(ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.c.slice(2, 5) }));
@@ -995,12 +1001,15 @@ function geomContains(geom, x, y) {
   return false;
 }
 const rawParcelsCache = {};
-async function rawParcels(code) {
-  if (!rawParcelsCache[code]) {
-    try { const r = await fetch(`parcels/${code}.geojson`); rawParcelsCache[code] = r.ok ? (await r.json()).features : []; }
-    catch (e) { rawParcelsCache[code] = []; }
-  }
-  return rawParcelsCache[code];
+const rawParcelsInflight = {};   // дедуп одновременных загрузок одного совета (наведение+контуры+клик не дублируют fetch)
+function rawParcels(code) {
+  if (rawParcelsCache[code]) return Promise.resolve(rawParcelsCache[code]);
+  if (rawParcelsInflight[code]) return rawParcelsInflight[code];
+  rawParcelsInflight[code] = fetch(`parcels/${code}.geojson`)
+    .then(r => r.ok ? r.json() : { features: [] })
+    .then(j => { rawParcelsCache[code] = j.features || []; delete rawParcelsInflight[code]; return rawParcelsCache[code]; })
+    .catch(() => { rawParcelsCache[code] = []; delete rawParcelsInflight[code]; return rawParcelsCache[code]; });
+  return rawParcelsInflight[code];
 }
 // Ближайшие к точке советы (для клика/наведения по тайлам — геометрию участков ищем у них)
 function nearCouncils(x, y) {
@@ -1067,7 +1076,7 @@ map.on('mousemove', e => {
     _hoverQueued = false;
     if (!tileHoverActive() || !_hoverLL) { setHoverParcel(null); return; }
     const x = _hoverLL.lng, y = _hoverLL.lat;
-    nearCouncils(x, y).forEach(c => { if (!rawParcelsCache[c.code]) rawParcels(c.code); });   // прогрев геометрии под курсором
+    const nc = nearCouncils(x, y); for (let i = 0; i < 2 && i < nc.length; i++) if (!rawParcelsCache[nc[i].code]) rawParcels(nc[i].code);   // греем только 2 ближайших (не пачку)
     setHoverParcel(findParcelCached(x, y));
   });
 });
@@ -1104,13 +1113,14 @@ function clearHiOutlines() { if (hiOutlineLayer) { map.removeLayer(hiOutlineLaye
 function syncHiZoomOutlines() {
   if (!tileParcelsMode() || map.getZoom() < HI_ZOOM) { clearHiOutlines(); return; }
   const b = map.getBounds(), W = b.getWest(), S = b.getSouth(), E = b.getEast(), N = b.getNorth();
-  const set = new Map();   // советы вокруг кадра (центр+углы → ближайшие)
-  [b.getCenter(), b.getNorthWest(), b.getNorthEast(), b.getSouthWest(), b.getSouthEast()]
-    .forEach(p => nearCouncils(p.lng, p.lat).forEach(c => set.set(c.code, c)));
-  const feats = []; let pending = false;
-  for (const c of set.values()) {
+  const ctr = b.getCenter();
+  const near = nearCouncils(ctr.lng, ctr.lat);                    // только по центру кадра (не грузим пачку по углам)
+  const toLoad = near.find(c => !(c.code in rawParcelsCache));    // максимум ОДИН несохранённый совет за вызов
+  if (toLoad) rawParcels(toLoad.code).then(() => { if (map.getZoom() >= HI_ZOOM) syncHiZoomOutlines(); });
+  const feats = [];
+  for (const c of near) {
     const fs = rawParcelsCache[c.code];
-    if (!fs) { rawParcels(c.code); pending = true; continue; }   // подгрузить, перерисуем по таймеру
+    if (!fs) continue;                                            // ещё не загружен — дорисуем, когда придёт
     for (const f of fs) {
       const bb = featBBox(f); if (!bb) continue;
       if (bb[2] < W || bb[0] > E || bb[3] < S || bb[1] > N) continue;   // не в кадре
@@ -1120,7 +1130,6 @@ function syncHiZoomOutlines() {
   clearHiOutlines();
   if (feats.length) hiOutlineLayer = L.geoJSON({ type: 'FeatureCollection', features: feats },
     { interactive: false, style: { color: '#0c0c0c', weight: 0.9, fill: false } }).addTo(map);
-  if (pending) setTimeout(syncHiZoomOutlines, 250);
 }
 function enableFullMap() {
   fullMapMode = true;
@@ -2245,7 +2254,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v6';
+const BUILD_VERSION = 'v7';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
