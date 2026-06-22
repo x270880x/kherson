@@ -776,16 +776,19 @@ function ensureFormLayer(form) {    // слой одной формы (для «
   return parcelLayers[form] || (parcelLayers[form] = L.vectorGrid.protobuf('tiles/{z}/{x}/{y}.pbf',
     Object.assign({}, TILE_VG_OPTS, { vectorTileLayerStyles: { parcels: (p) => tileStyle(p, form) } })));
 }
-function syncParcelTiles() {        // добавляем/убираем слои по видимости, не перерисовывая остальные
-  // «Полная карта» → один слой всех форм
-  if (fullMapMode) {
+function syncParcelTiles() {
+  // ОДИН слой всех форм, если: «Полная карта» ИЛИ «Вся карта» со всеми 4 формами (дефолт).
+  // Иначе (выключена хотя бы одна форма) — по слою на оставшиеся. Так в дефолте тайлы грузятся 1×, а не 4× (по слою на форму).
+  const allVisible = ['p','k','g','n'].every(f => allMapVisible.has(f));
+  const useAll = fullMapMode || (ownMode === 'all' && allVisible);
+  if (useAll) {
     if (!parcelTilesAll) parcelTilesAll = L.vectorGrid.protobuf('tiles/{z}/{x}/{y}.pbf',
       Object.assign({}, TILE_VG_OPTS, { vectorTileLayerStyles: { parcels: (p) => tileStyle(p) } }));
     if (!map.hasLayer(parcelTilesAll)) parcelTilesAll.addTo(map);
   } else if (parcelTilesAll && map.hasLayer(parcelTilesAll)) map.removeLayer(parcelTilesAll);
-  // «Вся карта» → по слою на форму (видна, если форма отмечена)
+  // per-form слои — только когда выбраны ОТДЕЛЬНЫЕ формы (не все)
   ['p','k','g','n'].forEach(form => {
-    const vis = ownMode === 'all' && allMapVisible.has(form);
+    const vis = ownMode === 'all' && !allVisible && allMapVisible.has(form);
     if (vis) { const l = ensureFormLayer(form); if (!map.hasLayer(l)) l.addTo(map); }
     else if (parcelLayers[form] && map.hasLayer(parcelLayers[form])) map.removeLayer(parcelLayers[form]);
   });
@@ -1303,7 +1306,7 @@ function applyOwnModeUI() {
     if (lbl) { lbl.style.opacity = dim ? '0.35' : ''; lbl.style.pointerEvents = dim ? 'none' : ''; }
   });
 }
-function setOwnMode(mode) {
+function setOwnMode(mode, noFly) {   // noFly: вид уже выставлен (старт) — не перелетать, чтобы тайлы грузились один раз
   if (mode === ownMode) return;
   ownMode = mode;
   try { localStorage.setItem('kherson_mode', mode); } catch (e) {}   // запомнить плашку — восстановим при следующем заходе
@@ -1315,8 +1318,8 @@ function setOwnMode(mode) {
     activePolyCode = null;
     document.querySelector('aside.right').classList.remove('open');   // свернуть правую панель при входе в «Вся карта»
     if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);   // вместо кружков — подписи названий (как в бете)
-    syncParcelTiles();    // + лёгкие векторные тайлы (по слою на форму; клик по участку с z12.5)
-    flyOverview(true);   // обзор, привязанный к экрану (как и «По сёлам»)
+    if (!noFly) flyOverview(true);   // обзор, привязанный к экрану (как и «По сёлам»)
+    syncParcelTiles();    // тайлы добавляем ПОСЛЕ установки вида → грузятся один раз для нужного зума
     labelsUpdate();
   } else {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
@@ -1325,7 +1328,7 @@ function setOwnMode(mode) {
     labelsClear();           // снять подписи
     if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки-маркеры
     buildMarkers();
-    flyOverview(true);   // «По сёлам»: тот же обзор, привязанный к экрану (как у «Вся карта»)
+    if (!noFly) flyOverview(true);   // «По сёлам»: тот же обзор, привязанный к экрану (как у «Вся карта»)
   }
   applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
   syncRazmezh();          // межевание видно по умолчанию в «Вся карта»
@@ -2240,19 +2243,17 @@ buildMarkers();
 // Старт: ?z=/?zoom= — сразу «Вся карта» на заданном зуме; иначе «По сёлам» с тем же обзором, привязанным к экрану
 const SAVED_MODE = (function () { try { return localStorage.getItem('kherson_mode'); } catch (e) { return null; } })();
 if (isFinite(Z_PARAM) && Z_PARAM > 0) {
-  setOwnMode('all');
-  map.stop();
-  map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: false });
+  map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: false });   // вид сразу
+  setOwnMode('all', true);                                     // затем тайлы — грузятся один раз
 } else if (SAVED_MODE === 'all') {
-  setOwnMode('all');   // восстановить последнюю открытую плашку «Вся карта»
-  map.stop();
-  flyOverview(false);  // мгновенный обзор (без анимации на старте)
+  map.setView(OVERVIEW_CENTER, overviewZoom(), { animate: false });   // восстановить «Вся карта»: вид сразу
+  setOwnMode('all', true);                                            // затем тайлы — без анимации, грузятся один раз
 } else {
   flyOverview(false);  // «По сёлам» — обзор, привязанный к экрану
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v8';
+const BUILD_VERSION = 'v10';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
