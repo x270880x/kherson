@@ -403,6 +403,26 @@
     if (this._ctx) this._ctx.scale(dpr, dpr);
   };
 })();
+// Тайлы .pbf пожаты gzip-ом (×3 по сети). GitHub Pages не ставит Content-Encoding → браузер и VectorGrid сами не разжимают. Распаковываем тут (нативный DecompressionStream).
+// Трогаем ТОЛЬКО .pbf; не-сжатые .pbf тоже работают (проверка по gzip-сигнатуре 1f 8b). Бета (MapLibre) разжимает gzip сама — её не трогаем.
+(function () {
+  if (!window.DecompressionStream || !window.fetch) return;
+  const origFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (!/\.pbf(\?|$)/.test(url)) return origFetch(input, init);
+    return origFetch(input, init).then(function (resp) {
+      if (!resp.ok) return resp;
+      return resp.arrayBuffer().then(function (buf) {
+        const b = new Uint8Array(buf);
+        if (b.length >= 2 && b[0] === 0x1f && b[1] === 0x8b) {   // gzip → распаковать
+          return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip')), { status: 200 });
+        }
+        return new Response(buf, { status: 200 });   // не сжато — как есть
+      });
+    });
+  };
+})();
 const DATA = JSON.parse(document.getElementById('data').textContent);
 
 // === Показывать только Херсонскую область, остальное скрыть ===
@@ -506,6 +526,15 @@ function flyOverview(animate) {   // обзор для ОБЕИХ плашек: 
   if (animate) map.flyTo(OVERVIEW_CENTER, z, { duration: 0.6 });
   else map.setView(OVERVIEW_CENTER, z, { animate: false });
 }
+// ── Лок карты: мин-зум ~8.5 (подгон под экран) + границы региона (за края не уехать ни на каком зуме) ──
+const MIN_ZOOM_BASE = 8.5;                                              // мин-зум на эталонном экране ~1440px (дальше отдалять нельзя)
+const PAN_BOUNDS = L.latLngBounds([45.72, 31.48], [47.65, 35.15]);     // края парцел Херсонщины +~0.05° (как PAN_BOUNDS в бете)
+function minZoomForScreen() { return MIN_ZOOM_BASE + Math.log2((window.innerWidth || 1440) / 1440); }   // авто-подгон под ширину экрана
+function applyMapLock() { map.setMinZoom(minZoomForScreen()); }
+map.setMaxBounds(PAN_BOUNDS);
+map.options.maxBoundsViscosity = 1.0;                                  // жёстко: за края региона не вытащить
+applyMapLock();
+window.addEventListener('resize', applyMapLock);                       // подстройка мин-зума под разные экраны
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
@@ -1044,7 +1073,7 @@ function findParcelCached(x, y) {
 }
 map.on('click', async e => {
   if (!fullMapMode && ownMode !== 'all') return;
-  if (ownMode === 'all' && map.getZoom() < 12.5) return;   // «Вся карта»: клик по участку только с z12.5 (ниже — статичный цветной слой)
+  if (ownMode === 'all' && map.getZoom() < 12.0) return;   // «Вся карта»: клик по участку с z12.0 (ниже — статичный цветной слой)
   const x = e.latlng.lng, y = e.latlng.lat;
   for (const c of nearCouncils(x, y)) {
     const feats = await rawParcels(c.code);
@@ -1061,7 +1090,7 @@ map.on('click', async e => {
 });
 // ===== Тайловый режим: наведение на участок (белый ободок) + ободки подборки (point-in-polygon) =====
 function tileParcelsMode() { return fullMapMode || ownMode === 'all'; }
-function tileHoverActive() { return tileParcelsMode() && map.getZoom() >= 12.5; }   // как порог клика по участку
+function tileHoverActive() { return tileParcelsMode() && map.getZoom() >= 12.0; }   // наведение/выделение участков — с z12.0
 let hoverParcelLayer = null, hoverParcelCad = null;
 function setHoverParcel(hit) {
   const cad = hit ? hit.feature.properties.cadnum : null;
@@ -1286,7 +1315,7 @@ async function showOwnRegion(ot) {
         style: { color: ownColor(ot), weight: 0.6, fillColor: ownColor(ot), fillOpacity: 0.5 }
       });
       lyr.on('click', e => {        // делегирование на весь слой (без обработчиков на каждом из десятков тысяч участков)
-        if (map.getZoom() < 12.5) return;   // ниже z12.5 — только статичный приблизительный цвет; на сами полигоны (клик/детали) переключаемся с z12.5
+        if (map.getZoom() < 12.0) return;   // ниже z12.0 — только статичный приблизительный цвет; на сами полигоны (клик/детали) переключаемся с z12.0
         const l = e.layer, f = l.feature, cad = f.properties.cadnum;
         if (e.originalEvent && e.originalEvent.shiftKey) { basketToggle(cad); L.DomEvent.stopPropagation(e); return; }
         const council = COUNCILS.find(c => c.code === cad.slice(0, 10));
@@ -1937,7 +1966,7 @@ function toggleBasketBtn(btn, cadnum) {
         }
       });
     }
-    if (tileParcelsMode() && map.getZoom() >= 12.5) {   // «Вся карта» — советы вокруг рамки (по центру села nearCouncils), участки с центром внутри
+    if (tileParcelsMode() && map.getZoom() >= 12.0) {   // «Вся карта» — советы вокруг рамки (по центру села nearCouncils), участки с центром внутри
       const set = new Map();   // центр + 4 угла рамки → ближайшие советы (центр села обычно рядом с его участками)
       [b.getCenter(), b.getNorthWest(), b.getNorthEast(), b.getSouthWest(), b.getSouthEast()]
         .forEach(p => nearCouncils(p.lng, p.lat).forEach(c => set.set(c.code, c)));
@@ -2257,7 +2286,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v17';
+const BUILD_VERSION = 'v18';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
