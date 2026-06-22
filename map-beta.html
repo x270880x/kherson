@@ -508,6 +508,10 @@ map.on('load', ()=>{
   map.addSource('fine',{type:'geojson',data:EMPTY});
   map.addLayer({id:'fine-fill',type:'fill',source:'fine',paint:{'fill-color':OWN_COLOR_EXPR,'fill-opacity':0.5,'fill-antialias':false}},'lbl-water');
   map.addLayer({id:'fine-line',type:'line',source:'fine',paint:{'line-color':'#0c0f17','line-width':['interpolate',['linear'],['zoom'], 12.5,0.4, 14,0.8, 16,1.5, 18,2.3]}},'lbl-water');
+  // подсветка участка под курсором (как mouseover в оригинале)
+  map.addSource('hover',{type:'geojson',data:EMPTY});
+  map.addLayer({id:'hover-fill',type:'fill',source:'hover',paint:{'fill-color':'#ffffff','fill-opacity':0.18}});
+  map.addLayer({id:'hover-line',type:'line',source:'hover',paint:{'line-color':'#ffffff','line-width':2.2}});
   // подборка — поверх всего
   map.addSource('basket',{type:'geojson',data:EMPTY});
   map.addLayer({id:'basket-fill',type:'fill',source:'basket',paint:{'fill-color':'#ffec3d','fill-opacity':0.45}});
@@ -645,6 +649,19 @@ document.getElementById('f-r').addEventListener('change', e=>{
   fineUpdate();
 });
 map.on('moveend', ()=>{ if(hasFine()) fineUpdate(); });
+
+// Подсветка участка под курсором — белая обводка (как mouseover в оригинале)
+let _hov=false;
+map.on('mousemove', e=>{
+  if(bs) return;                                   // во время Shift-рамки не подсвечиваем
+  const src=map.getSource('hover'); if(!src) return;
+  if(map.getZoom()<12.5){ if(_hov){ src.setData(EMPTY); _hov=false; } return; }
+  const lyrs=['parcels-fill','fine-fill'].filter(id=>map.getLayer(id));
+  const f=lyrs.length ? map.queryRenderedFeatures(e.point,{layers:lyrs}) : [];
+  if(f.length){ src.setData({type:'Feature',geometry:f[0].geometry,properties:{}}); _hov=true; map.getCanvas().style.cursor='pointer'; }
+  else if(_hov){ src.setData(EMPTY); _hov=false; map.getCanvas().style.cursor=''; }
+});
+map.on('mouseout', ()=>{ const src=map.getSource('hover'); if(src&&_hov){ src.setData(EMPTY); _hov=false; } });
 </script>
 </body>
 </html>
