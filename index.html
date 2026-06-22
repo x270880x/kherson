@@ -863,12 +863,14 @@ fetch('councils-index.json').then(r => r.json())
   .then(() => { buildLabelPts(); if (labelsActive()) labelsUpdate(); });
 
 // ── Навигация по клику в «Вся карта» (всё строго по центру НП) ──
-const NP_ZOOM_RAION = 11.5, NP_ZOOM_CLOSE = 13.0;   // 1-й клик по райцентру / 2-й клик (любое НП), на экране ~1440px
+const NP_ZOOM_1 = 11.5, NP_ZOOM_2 = 13.0, NP_ZOOM_3 = 14.0;   // 1-й клик по райцентру / 2-й клик / 3-й клик, на экране ~1440px
 function npZoom(base) { return base + Math.log2((window.innerWidth || 1440) / 1440); }   // подстройка под размер монитора
-let raionDrilled = false;
-function clickNP(p) {   // 1-й клик по райцентру → плавно к 11.5 (центр на нём); 2-й клик по любому НП → 13.0; всё по центру, привязано к экрану
-  if (isCenter(p) && !raionDrilled) { raionDrilled = true; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_RAION), { duration: 1.4 }); }
-  else { raionDrilled = false; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_CLOSE), { duration: 1.1 }); }
+let clickStep = 0, clickRaion = '';
+function clickNP(p) {   // прогрессия по кликам: райцентр → 11.5, 2-й → 13.0, 3-й+ → 14.0; всё по центру, плавно, привязано к экрану
+  const raion = RAION_BY_PREFIX[p.rpfx] || p.c;
+  if (isCenter(p) && (clickStep === 0 || raion !== clickRaion)) { clickStep = 1; clickRaion = raion; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_1), { duration: 1.4 }); }
+  else if (clickStep <= 1) { clickStep = 2; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_2), { duration: 1.1 }); }
+  else { clickStep = 3; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_3), { duration: 1.0 }); }
 }
 
 // ── Наведение → табличка форм собственности: для центра по ВСЕМУ району, для села по совету ──
@@ -2239,7 +2241,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v12';
+const BUILD_VERSION = 'v13';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
