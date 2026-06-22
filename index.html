@@ -909,6 +909,27 @@ function raionTableHTML(rname) {
 function showOwnTable(p) { if (p.o) showTable([p.lat, p.lon], ownTableHTML(p)); }
 function showRaionTable(p) { const rname = RAION_BY_PREFIX[p.rpfx]; if (rname) showTable([p.lat, p.lon], raionTableHTML(rname)); }
 
+// Наведение в ОБЛАСТЬ НП на ЛЮБОМ зуме: по карте ищем ближайший НП и показываем его табличку у курсора (не только на подписи)
+function nearestCouncil(lng, lat) { let best = null, bd = 1e9; for (const c of CIDX) { const d = (c.lat - lat) ** 2 + (c.lon - lng) ** 2; if (d < bd) { bd = d; best = c; } } return { best, bd }; }
+let lastHoverCode = '';
+function mapAreaHover(latlng) {
+  const { best, bd } = nearestCouncil(latlng.lng, latlng.lat);
+  if (!best || bd > 0.06 || !best.o) { clearHover(); lastHoverCode = ''; return; }   // далеко от НП (море/край области) — скрыть
+  if (hoverPop) {                         // переиспользуем попап: двигаем за курсором, содержимое — только при смене НП (без дёрганья/двойных попапов)
+    hoverPop.setLatLng(latlng);
+    if (best.c !== lastHoverCode) hoverPop.setContent(ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.c.slice(2, 5) }));
+  } else {
+    showTable(latlng, ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.c.slice(2, 5) }));
+  }
+  lastHoverCode = best.c;
+}
+map.on('mousemove', e => {
+  if (!labelsActive() || !CIDX.length) return;                 // только в «Вся карта»
+  if (e.originalEvent && e.originalEvent.shiftKey) return;      // не мешать Shift-рамке подборки
+  mapAreaHover(e.latlng);
+});
+map.on('mouseout', () => { clearHover(); lastHoverCode = ''; });
+
 function makeLabel(p) {
   const center = isCenter(p);
   const cls = 'council-label' + (center ? ' town' : '') + (p.capital ? ' capital' : '');
@@ -2101,7 +2122,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v3';
+const BUILD_VERSION = 'v4';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
