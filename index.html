@@ -857,7 +857,35 @@ fetch('councils-index.json').then(r => r.json())
   .catch(() => { CIDX = COUNCILS.map(councilToCidx); })   // офлайн-фоллбэк: те же советы из встроенных данных
   .then(() => { buildLabelPts(); if (labelsActive()) labelsUpdate(); });
 
-// ── Навигация по клику в «Вся карта»: клик по зоне НП (подписи) → зум-ин на 1 уровень за клик, центр на НП (см. makeLabel) ──
+// ── Навигация по клику в «Вся карта» (всё строго по центру НП) ──
+let centerClickCode = '', centerClickStep = 0;   // прогрессия кликов по центру района
+function fitNearestN(lat, lon, n) {   // кадрируем n ближайших НП, кликнутый строго ПО ЦЕНТРУ (симметричная рамка)
+  const near = CIDX.filter(c => c.lat && c.lon).map(c => ({ c, d: (c.lat - lat) ** 2 + (c.lon - lon) ** 2 })).sort((a, b) => a.d - b.d).slice(0, n);
+  if (!near.length) { map.flyTo([lat, lon], map.getZoom() + 1, { duration: 0.5 }); return; }
+  const rLat = Math.max(...near.map(o => Math.abs(o.c.lat - lat))), rLon = Math.max(...near.map(o => Math.abs(o.c.lon - lon)));
+  const box = L.latLngBounds([lat - rLat - 0.01, lon - rLon - 0.01], [lat + rLat + 0.01, lon + rLon + 0.01]);
+  const z = Math.min(map.getBoundsZoom(box, false, L.point(40, 40)), 14);
+  map.flyTo([lat, lon], z, { duration: 0.6 });
+}
+function raionZoom(p) {   // весь район на экран, центр — на центре района (симметричная рамка вокруг центра)
+  const rname = RAION_BY_PREFIX[p.rpfx] || '';
+  const rc = (rname ? CIDX.filter(c => raionOf(c.c) === rname) : []).filter(c => c.lat && c.lon);
+  if (!rc.length) { map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 }); return; }
+  const rLat = Math.max(...rc.map(c => Math.abs(c.lat - p.lat))), rLon = Math.max(...rc.map(c => Math.abs(c.lon - p.lon)));
+  const box = L.latLngBounds([p.lat - rLat - 0.03, p.lon - rLon - 0.03], [p.lat + rLat + 0.03, p.lon + rLon + 0.03]);
+  const z = Math.min(map.getBoundsZoom(box, false, L.point(30, 30)), 14);
+  map.flyTo([p.lat, p.lon], z, { duration: 0.8 });   // центр района — строго по центру экрана
+}
+function clickNP(p) {   // клик по подписи НП: центр района — прогрессивно (район → пгт+3 села → ближе), село — +1 за клик
+  if (isCenter(p)) {
+    if (p.c === centerClickCode) centerClickStep++; else { centerClickCode = p.c; centerClickStep = 0; }
+    if (centerClickStep === 0) raionZoom(p);                  // 1-й клик — весь район
+    else if (centerClickStep === 1) fitNearestN(p.lat, p.lon, 4);   // 2-й клик — пгт + 3 села
+    else map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 });   // дальше — +1 за клик
+  } else {
+    map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 });   // село/пгт — +1 за клик, по центру
+  }
+}
 
 // ── Наведение → табличка форм собственности: для центра по ВСЕМУ району, для села по совету ──
 let hoverPop = null;
@@ -892,7 +920,7 @@ function makeLabel(p) {
     el.addEventListener('click', ev => {
       ev.stopPropagation();
       clearHover();
-      map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 });   // зум-ин на 1 уровень за клик, центр — НП (только «Вся карта»)
+      clickNP(p);   // центр района — прогрессивно (район → пгт+3); село — +1 за клик; всё по центру
     });
   }
   return tip;
@@ -1145,6 +1173,7 @@ function setOwnMode(mode) {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = true);
     for (const c in polygonLayers) if (map.hasLayer(polygonLayers[c])) map.removeLayer(polygonLayers[c]);  // убрать полигоны открытых сёл
     activePolyCode = null;
+    document.querySelector('aside.right').classList.remove('open');   // свернуть правую панель при входе в «Вся карта»
     if (map.hasLayer(clusterGroup)) map.removeLayer(clusterGroup);   // вместо кружков — подписи названий (как в бете)
     syncParcelTiles();    // + лёгкие векторные тайлы (по слою на форму; клик по участку с z12.5)
     flyOverview(true);   // обзор, привязанный к экрану (как и «По сёлам»)
