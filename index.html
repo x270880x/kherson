@@ -869,19 +869,12 @@ function fitNearestN(lat, lon, n) {   // кадрируем n ближайших
   const z = Math.min(map.getBoundsZoom(box, false, L.point(40, 40)), 14);
   map.flyTo([lat, lon], z, { duration: 0.6 });
 }
-function raionZoom(p) {   // весь район на экран, центр — на центре района (симметричная рамка вокруг центра)
-  const rname = RAION_BY_PREFIX[p.rpfx] || '';
-  const rc = (rname ? CIDX.filter(c => raionOf(c.c) === rname) : []).filter(c => c.lat && c.lon);
-  if (!rc.length) { map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 }); return; }
-  const rLat = Math.max(...rc.map(c => Math.abs(c.lat - p.lat))), rLon = Math.max(...rc.map(c => Math.abs(c.lon - p.lon)));
-  const box = L.latLngBounds([p.lat - rLat - 0.03, p.lon - rLon - 0.03], [p.lat + rLat + 0.03, p.lon + rLon + 0.03]);
-  const z = Math.min(map.getBoundsZoom(box, false, L.point(30, 30)), 14);
-  map.flyTo([p.lat, p.lon], z, { duration: 0.8 });   // центр района — строго по центру экрана
-}
-function clickNP(p) {   // клик по подписи НП: центр района — прогрессивно (район → пгт+3 села → ближе), село — +1 за клик
+const RAION_ZOOM_BASE = 11.2;   // зум 1-го клика по райцентру (на экране ~1440px)
+function raionZoomLevel() { return RAION_ZOOM_BASE + Math.log2((window.innerWidth || 1440) / 1440); }   // привязка к ширине экрана
+function clickNP(p) {   // клик по подписи НП: центр района — прогрессивно (зум 11.2 → пгт+3 села → ближе), село — +1 за клик
   if (isCenter(p)) {
     if (p.c === centerClickCode) centerClickStep++; else { centerClickCode = p.c; centerClickStep = 0; }
-    if (centerClickStep === 0) raionZoom(p);                  // 1-й клик — весь район
+    if (centerClickStep === 0) map.flyTo([p.lat, p.lon], raionZoomLevel(), { duration: 0.6 });   // 1-й клик — зум ~11.2, привязан к экрану, центр на райцентре
     else if (centerClickStep === 1) fitNearestN(p.lat, p.lon, 4);   // 2-й клик — пгт + 3 села
     else map.flyTo([p.lat, p.lon], map.getZoom() + 1, { duration: 0.5 });   // дальше — +1 за клик
   } else {
