@@ -288,6 +288,8 @@ function popupHTML(rec, cname){
   if(rec.ct) h+='<div style="color:#8b91a8;font-size:10px;margin-top:4px">Назначение: <span style="color:#cdd2e0">'+esc(catRu(rec.ct))+'</span></div>';
   if(rec.use) h+='<div style="color:#8b91a8;font-size:10px;margin-top:2px">Использование: <span style="color:#cdd2e0">'+esc(rec.use)+'</span></div>';
   if(rec.mz) h+='<div style="margin-top:5px;padding:4px 7px;background:rgba(192,80,255,.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="display:flex;align-items:center;gap:6px"><span style="font-family:ui-monospace,monospace;font-size:11px;color:#fff;word-break:break-all">'+esc(rec.mz)+'</span>'+copyBtn(rec.mz,'Скопировать кадастр РФ')+'</div></div>';
+  const inB=basket.has(rec.c);   // кнопка «в подборку» прямо в попапе
+  h+='<button onclick="popupBasket(this)" style="margin-top:8px;width:100%;box-sizing:border-box;background:'+(inB?'#d95e52':'#e8c547')+';color:'+(inB?'#fff':'#1a1a1a')+';border:none;border-radius:4px;padding:6px;font-size:12px;font-weight:600;cursor:pointer">'+(inB?'− убрать из подборки':'+ в подборку')+'</button>';
   return h+'</div>';
 }
 let boxDragged=false;
@@ -295,7 +297,7 @@ map.on('click', 'parcels-fill', async e => {
   if(boxDragged){ boxDragged=false; return; }            // после рамки клик не обрабатываем
   const _lbls=['lbl-place'].concat(map.getLayer('lbl-councils')?['lbl-councils']:[]).concat(map.getLayer('lbl-centers')?['lbl-centers']:[]).concat(map.getLayer('centers-hit')?['centers-hit']:[]);
   if(map.queryRenderedFeatures(e.point,{layers:_lbls}).length) return;   // клик по названию НП (OMT / наш совет / центр) → зум, не плашка участка
-  if(map.getZoom()<12.5) return;   // ниже z12.5 — только статичный приблизительный цвет; на сами полигоны (клик/детали) переключаемся с z12.5
+  if(map.getZoom()<11.5) return;   // ниже z11.5 — только статичный приблизительный цвет; клик/детали — с z11.5
   const x=e.lngLat.lng, y=e.lngLat.lat, shift=e.originalEvent && e.originalEvent.shiftKey;
   const popup = shift ? null : new maplibregl.Popup({maxWidth:'320px'}).setLngLat(e.lngLat).setHTML('<span style="font-size:12px;color:#8b91a8">загрузка…</span>').addTo(map);
   const near=CIDX.filter(c=>Math.abs(c.lat-y)<0.25&&Math.abs(c.lon-x)<0.3).sort((a,b)=>((a.lat-y)**2+(a.lon-x)**2)-((b.lat-y)**2+(b.lon-x)**2)).slice(0,4);
@@ -304,7 +306,7 @@ map.on('click', 'parcels-fill', async e => {
     const hit=feats.find(f=>f.geometry&&geomHas(f.geometry,x,y));
     if(hit){ const cad=hit.properties.cadnum; const rec=(await councilParcels(c.c)).find(p=>p.c===cad)||{c:cad};
       if(shift) basketToggle(cad, hit.geometry, rec, ruName(c.n));
-      else popup.setHTML(popupHTML(rec, ruName(c.n)));
+      else { _popupParcel={cad, geom:hit.geometry, rec, cname:ruName(c.n)}; popup.setHTML(popupHTML(rec, ruName(c.n))); }
       return; }
   }
   if(!shift){ const o=OWN[e.features[0].properties.o]||['—','#888']; popup.setHTML('<div style="font-size:12px"><b style="color:'+o[1]+'">'+o[0]+'</b><div style="color:#8b91a8;font-size:10px;margin-top:2px">точный участок не найден</div></div>'); }
@@ -461,6 +463,15 @@ function basketRefresh(){
 function basketToggle(cad, geom, rec, cname){
   if(basket.has(cad)) basket.delete(cad); else basket.set(cad,{geom,rec,cname});
   basketRefresh();
+}
+let _popupParcel=null;   // {cad,geom,rec,cname} текущего попапа — для кнопки «в подборку»
+function popupBasket(btn){
+  if(!_popupParcel) return;
+  basketToggle(_popupParcel.cad, _popupParcel.geom, _popupParcel.rec, _popupParcel.cname);
+  const inB=basket.has(_popupParcel.cad);
+  btn.textContent = inB ? '− убрать из подборки' : '+ в подборку';
+  btn.style.background = inB ? '#d95e52' : '#e8c547';
+  btn.style.color = inB ? '#fff' : '#1a1a1a';
 }
 const OWN_COLOR_EXPR=['match',['get','o'],'p','#27ad60','k','#c5a73c','g','#3f86d9','n','#d95e52','#747474'];   // −15% яркости (RGB×0.85) — заливка участков
 const EMPTY={type:'FeatureCollection',features:[]};
@@ -644,7 +655,7 @@ let _hov=false;
 map.on('mousemove', e=>{
   if(bs) return;                                   // во время Shift-рамки не подсвечиваем
   const src=map.getSource('hover'); if(!src) return;
-  if(map.getZoom()<12.5){ if(_hov){ src.setData(EMPTY); _hov=false; } return; }
+  if(map.getZoom()<11.5){ if(_hov){ src.setData(EMPTY); _hov=false; } return; }
   const lyrs=['parcels-fill','fine-fill'].filter(id=>map.getLayer(id));
   const f=lyrs.length ? map.queryRenderedFeatures(e.point,{layers:lyrs}) : [];
   if(f.length){ src.setData({type:'Feature',geometry:f[0].geometry,properties:{}}); _hov=true; map.getCanvas().style.cursor='pointer'; }
