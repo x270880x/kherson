@@ -343,33 +343,19 @@ function drillVillage(lng, lat){
   if(step.z!=null) map.easeTo({center:[lng,lat], zoom:step.z, duration:700, essential:true});
   else fitNearestN(lng, lat, step.n);
 }
-// Клик по названию города/села на карте → приближение сразу в его район (масштаб по типу НП)
-map.on('click','lbl-place', e=>{
-  const f=e.features&&e.features[0]; if(!f) return;
-  const cls=f.properties.class, lat=e.lngLat.lat, lng=e.lngLat.lng;
-
-  if(cls==='county'||cls==='district'){
-    // fitBounds на весь район: ближайший совет → raion-prefix → bounds всех советов
-    if(CIDX.length){
-      let best=null,bd=1e9;
-      for(const c of CIDX){ const d=(c.lat-lat)**2+(c.lon-lng)**2; if(d<bd){bd=d;best=c;} }
-      if(best){
-        const pfx=best.c.slice(2,5);
-        const rc=CIDX.filter(c=>c.c.slice(2,5)===pfx&&c.lat&&c.lon);
-        if(rc.length){
-          const los=rc.map(c=>c.lon), las=rc.map(c=>c.lat);   // фактический bbox района → весь район в кадре по максимуму
-          map.fitBounds([[Math.min(...los)-.05,Math.min(...las)-.05],[Math.max(...los)+.05,Math.max(...las)+.05]],{padding:22,duration:1600,essential:true});
-          return;
-        }
-      }
-    }
-    map.flyTo({center:e.lngLat,zoom:9,duration:1600,essential:true});
-    return;
-  }
-
-  // city/town/village/hamlet — прогрессивный drill (8 → 3 → 1) по повторным кликам
-  drillVillage(lng, lat);
-});
+// Прогрессивный зум по повторным кликам на ОДИН НП: 11.5 → 13 → 14 → 14.5 → 15. Клик по ДРУГОМУ НП — прогрессия заново.
+const NP_ZOOM_SEQ=[11.5,13,14,14.5,15];
+let npKey='', npStep=0;
+function clickNP(coords){
+  const key=coords[0].toFixed(4)+','+coords[1].toFixed(4);
+  if(key!==npKey){ npKey=key; npStep=0; }            // другой НП — с первого шага
+  const z=NP_ZOOM_SEQ[Math.min(npStep, NP_ZOOM_SEQ.length-1)];
+  npStep++;
+  map.easeTo({ center:coords, zoom:z, duration:1400, essential:true,   // медленно и плавно
+    easing:t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2 });                    // easeInOutQuad
+}
+// Клик по названию НП (город/село) → прогрессивный зум по центру НП
+map.on('click','lbl-place', e=>{ const f=e.features&&e.features[0]; if(f) clickNP(f.geometry.coordinates); });
 // Наведение на НП → табличка форм собственности ближайшего совета (счётчики участков)
 const hoverPop = new maplibregl.Popup({ closeButton:false, closeOnClick:false, offset:12, maxWidth:'none', className:'rt-hover-pop' });
 document.head.insertAdjacentHTML('beforeend','<style>.rt-hover-pop{pointer-events:none}.rt-hover-pop .maplibregl-popup-content{padding:7px 9px}</style>');
@@ -403,8 +389,8 @@ map.on('mouseenter','lbl-councils', e=>{ map.getCanvas().style.cursor='pointer';
 const clearHover=()=>{ map.getCanvas().style.cursor=''; hoverPop.remove(); };
 map.on('mouseleave','lbl-place', clearHover);
 map.on('mouseleave','lbl-councils', clearHover);
-// Клик по подписи совета (наш слой) → приближение к селу + соседним (как у lbl-place city/village)
-map.on('click','lbl-councils', e=>{ drillVillage(e.lngLat.lng, e.lngLat.lat); });
+// Клик по подписи совета (наш слой) → прогрессивный зум по центру НП
+map.on('click','lbl-councils', e=>{ const f=e.features&&e.features[0]; clickNP(f?f.geometry.coordinates:[e.lngLat.lng,e.lngLat.lat]); });
 // Райцентры: события на прозрачной хитзоне centers-hit (зона больше подписи). Наведение → данные ВСЕГО района; клик → плавный зум во весь район.
 map.on('mouseenter','centers-hit', e=>{
   map.getCanvas().style.cursor='pointer';
@@ -412,19 +398,7 @@ map.on('mouseenter','centers-hit', e=>{
   const rname=RAION_BY_PREFIX[f.properties.rpfx]; if(rname) showRaionTable(f.geometry.coordinates, rname);
 });
 map.on('mouseleave','centers-hit', clearHover);
-map.on('click','centers-hit', e=>{
-  const f=e.features&&e.features[0]; if(!f) return;
-  drillCode='';   // клик по району сбрасывает прогрессию drill по сёлам (следующий клик по селу — снова с ~8)
-  const co=f.geometry.coordinates, lng=co[0], lat=co[1];   // координаты самого центра (точнее точки клика в круге)
-  const rname=RAION_BY_PREFIX[f.properties.rpfx]||'';
-  const rc=(rname?CIDX.filter(c=>raionOf(c.c)===rname):[]).filter(c=>c.lat&&c.lon);
-  if(rc.length){
-    const los=rc.map(c=>c.lon), las=rc.map(c=>c.lat);   // фактический bbox района → весь район в кадре по максимуму
-    map.fitBounds([[Math.min(...los)-.05,Math.min(...las)-.05],[Math.max(...los)+.05,Math.max(...las)+.05]],{padding:22,duration:1600,essential:true});
-    return;
-  }
-  map.flyTo({center:[lng,lat],zoom:9,duration:1600,essential:true});
-});
+map.on('click','centers-hit', e=>{ const f=e.features&&e.features[0]; if(f) clickNP(f.geometry.coordinates); });   // райцентр → прогрессивный зум (как любой НП)
 
 // Переключатели форм собственности — показать/скрыть по ВСЕЙ карте (вкл. частные)
 const ownActive = new Set(['p','k','g','n']);
