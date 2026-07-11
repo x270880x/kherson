@@ -1509,10 +1509,10 @@ async function showDetail(code) {
           <span class="area">${p.a} га</span>
           ${p.r ? `<div class="field"><span class="label">аренд.: </span><span class="val">${escapeHtml(p.r)}</span></div>` : ''}
           ${p.o ? `<div class="field"><span class="label">собств.: </span><span class="val">${escapeHtml(p.o)}${p.oc>1?` <span style="color:var(--muted)">(+${p.oc-1} совладельца)</span>`:''}</span></div>` : ''}
-          ${p.oi ? `<div class="field"><span class="label">ІПН собств.: </span><span class="val" style="font-family:'IBM Plex Mono',monospace">${escapeHtml(p.oi)}</span></div>` : ''}
+          ${p.oi ? `<div class="field"><span class="label">ИНН собств.: </span><span class="val" style="font-family:'IBM Plex Mono',monospace">${escapeHtml(p.oi)}</span></div>` : ''}
           ${p.od ? `<div class="field"><span class="label">право зарег.: </span><span class="val">${p.od}</span></div>` : ''}
           ${p.ed ? `<div class="field"><span class="label">договор: </span><span class="val" ${expClass}>до ${p.ed}${p.cn?` · №${escapeHtml(p.cn)}`:''}${p.ra?` · ${p.ra} грн`:''}${p.np?` · ${p.np}% НГО`:''}</span></div>` : ''}
-          ${p.re ? `<div class="field"><span class="label">ЄДРПОУ аренд.: </span><span class="val" style="font-family:'IBM Plex Mono',monospace">${escapeHtml(p.re)}</span></div>` : ''}
+          ${p.re ? `<div class="field"><span class="label">ЕГРПОУ аренд.: </span><span class="val" style="font-family:'IBM Plex Mono',monospace">${escapeHtml(p.re)}</span></div>` : ''}
           ${p.ad ? `<div class="field"><span class="label">адр.: </span><span class="val">${escapeHtml(p.ad)}</span></div>` : ''}
         </div>
       `;}).join('')}
@@ -1552,8 +1552,8 @@ function parcelsToRows(parcels, council) {
     'Окончание договора': p.ed || '',
     'Размер аренды, грн': p.ra ?? '',
     '% НГО': p.np ?? '',
-    'RU кадастр (межевание)': p.mz || '',
-    'RU муниципалитет': p.mzmo || '',
+    'РФ кадастр (межевание)': p.mz || '',
+    'РФ муниципалитет': p.mzmo || '',
     'Факт передачи': p.mzp || '',
     'Адрес': p.ad || '',
   }));
@@ -2174,7 +2174,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v22';
+const BUILD_VERSION = 'v23';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
