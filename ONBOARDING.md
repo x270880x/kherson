@@ -3,7 +3,7 @@
 Этот файл — чтобы подхватить проект «с нуля» в новом чате. История изменений — в [CHANGELOG.md](CHANGELOG.md).
 
 ## Где что лежит
-- **Локально:** `~/Documents/kherson/` (это git-репозиторий).
+- **Локально:** `~/Documents/Дизайны/Kherson- кадастровая карта/` (это git-репозиторий; переехал 2026-06-23 из `~/Documents/kherson/`).
 - **GitHub:** https://github.com/x270880x/kherson (ветка `main`).
 - **Живой сайт:** https://x270880x.github.io/kherson/ (GitHub Pages, деплой из `main`, обновляется ~1 мин после push).
 
@@ -15,7 +15,7 @@
 - ✅ **Встроенный `<script id="data">` в index.html пересобран** (2026-06-21) под актуальные данные: 372 совета (Херсон-only), `stats` 613 471 уч. / 372 совета / 2 162 361 га. Живая шапка главной показывает корректные числа.
 
 ## Как запустить (preview)
-Сервер настроен в `~/.claude/launch.json` под именем **`kherson`** (python `serve.py`, порт **8773**, корень `~/Documents/kherson`).
+Сервер настроен в `~/.claude/launch.json` под именем **`kherson`** (python `serve.py`, порт **8773**, корень `~/Documents/Дизайны/Kherson- кадастровая карта`).
 1. `preview_start` с `name: "kherson"` (НЕ через Bash).
 2. Проверять: `preview_eval` (состояние), `preview_screenshot` (вид), `preview_console_logs` (ошибки).
 3. **Важно:** preview-окно бывает узким (мобильная ширина). Для десктоп-проверки `preview_resize` на 1440×900; для мобильной — preset `mobile` (375).
