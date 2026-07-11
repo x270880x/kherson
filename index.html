@@ -963,12 +963,16 @@ function mapAreaHover(latlng, ev) {
   }
   lastHoverCode = best.c;
 }
+let _mahQ = false, _mahArgs = null;
 map.on('mousemove', e => {
   if (!labelsActive() || !CIDX.length) return;                 // только в «Вся карта»
   if (e.originalEvent && e.originalEvent.shiftKey) return;      // не мешать Shift-рамке подборки
   const t = e.originalEvent && e.originalEvent.target;
   if (t && t.closest && t.closest('.leaflet-tooltip.council-label')) return;   // над подписью — её собственный hover (центр→район, село→совет)
-  mapAreaHover(e.latlng, e.originalEvent);
+  _mahArgs = [e.latlng, e.originalEvent];
+  if (_mahQ) return;                                           // не чаще кадра (скан LABEL_PTS не на каждый пиксель)
+  _mahQ = true;
+  requestAnimationFrame(() => { _mahQ = false; if (_mahArgs) mapAreaHover(_mahArgs[0], _mahArgs[1]); });
 });
 // mouseleave контейнера (НЕ map 'mouseout', который срабатывает при заходе на подпись и гасил табличку)
 map.getContainer().addEventListener('mouseleave', () => { clearHover(); lastHoverCode = ''; });
@@ -1203,8 +1207,6 @@ let filterRenter = '';
 let filterOwnership = new Set();
 // Режим блока собственности: 'council' (фильтр по открытым сёлам) | 'all' (показ типа по всей области)
 let ownMode = 'council';
-const ownRegionLayers = {};   // ot → L.geoJSON (региональный слой, lazy)
-const OWN_FILE = { 'Державна власність': 'own_gos', 'Комунальна власність': 'own_kom', 'Не визначено': 'own_nedef' };
 let filterCategory = '';
 let filterRegion = '';
 let filterLeaseYear = '';
@@ -1305,9 +1307,6 @@ function getFilteredStats(council) {
 function fmt(n) { return Number(n).toLocaleString('ru'); }
 
 // ── Режим «вся карта»: показ участков выбранной формы собственности по всей области ──
-function hideOwnRegion(ot) {
-  if (ownRegionLayers[ot] && map.hasLayer(ownRegionLayers[ot])) map.removeLayer(ownRegionLayers[ot]);
-}
 function applyOwnModeUI() {
   document.querySelectorAll('#own-mode button').forEach(b => b.classList.toggle('on', b.dataset.mode === ownMode));
   document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => {
@@ -1334,7 +1333,6 @@ function setOwnMode(mode, noFly) {   // noFly: вид уже выставлен 
     labelsUpdate();
   } else {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
-    for (const ot in ownRegionLayers) hideOwnRegion(ot);   // убрать региональные слои (легаси own_*)
     syncParcelTiles();       // убрать тайлы
     labelsClear();           // снять подписи
     if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки-маркеры
@@ -2176,7 +2174,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v20';
+const BUILD_VERSION = 'v21';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);

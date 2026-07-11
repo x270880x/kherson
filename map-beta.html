@@ -141,7 +141,7 @@ const zoutBtn = document.getElementById('zout');
 function updateZoutBtn(){ const dis=map.getZoom()<=map.getMinZoom()+0.05; zoutBtn.style.opacity=dis?'.3':''; zoutBtn.style.pointerEvents=dis?'none':''; }
 map.on('zoom', updateZoutBtn);
 // Технический блок в правом нижнем углу: живой зум + версия (бампить при каждом апдейте беты)
-const BUILD_VERSION='b2';
+const BUILD_VERSION='b3';
 const betaInfo=document.createElement('div'); betaInfo.id='betainfo'; document.body.appendChild(betaInfo);
 function updateBetaInfo(){ betaInfo.textContent='z '+map.getZoom().toFixed(2)+' · '+BUILD_VERSION; }
 map.on('zoom', updateBetaInfo); map.on('moveend', updateBetaInfo); updateBetaInfo();
@@ -357,11 +357,13 @@ function ownTableHTML(c){
 function nearestCouncil(lon,lat){ let best=null,bd=1e9; for(const c of CIDX){ const d=(c.lat-lat)**2+(c.lon-lon)**2; if(d<bd){bd=d;best=c;} } return {best,bd}; }
 function showHoverTable(ll){ if(!CIDX.length) return; const {best,bd}=nearestCouncil(ll[0],ll[1]); if(best && best.o && bd<0.04) hoverPop.setLngLat(ll).setHTML(ownTableHTML(best)).addTo(map); }   // в пределах ~22км (свои советы, не соседние области)
 // Агрегат по ВСЕМУ району (для наведения на райцентр)
+const _raionHtml={};   // мемо: агрегат района зависит только от rname (данные CIDX не меняются)
 function raionTableHTML(rname){
+  if(_raionHtml[rname]) return _raionHtml[rname];
   const rc=CIDX.filter(c=>raionOf(c.c)===rname), cats=['p','k','g','n'], o={p:0,k:0,g:0,n:0}; let tot=0, ha=0;
   for(const c of rc){ const co=c.o||{}; for(const k of cats) o[k]+=co[k]||0; tot+=c.total||0; ha+=c.ha||0; }
   const nums=cats.map(k=>'<div style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:'+OWN[k][1]+';flex-shrink:0"></span><b style="font-family:ui-monospace,monospace;color:#e8e8ea;font-weight:600">'+o[k].toLocaleString('ru')+'</b></div>').join('');
-  return '<div style="font-size:11px;line-height:1.5;min-width:190px">'
+  return _raionHtml[rname]='<div style="font-size:11px;line-height:1.5;min-width:190px">'
     +'<div style="color:#e8c547;font-weight:600">'+esc(rname)+'</div>'
     +'<div style="color:#8b91a8;font-size:10px">'+rc.length+' НП · весь район</div>'
     +'<div style="color:#cfd3df;font-family:ui-monospace,monospace;margin:3px 0 5px">'+tot.toLocaleString('ru')+' уч. · '+Math.round(ha).toLocaleString('ru')+' га</div>'
@@ -518,7 +520,7 @@ map.on('load', ()=>{
     map.setMinZoom(7.7);                       // 7.7 — минимум зум-аута, дальше отдалять нельзя (за края не уехать — clampCenter на moveend)
     map.jumpTo({ center: cam.center, zoom: START_ZOOM });
     // подписи сёл — только при приближении (выше старта), на обзоре остаются лишь райцентры
-    if(map.getLayer('lbl-councils')) map.setLayoutProperty('lbl-councils','minzoom', fz + 1.6);
+    if(map.getLayer('lbl-councils')) map.setLayerZoomRange('lbl-councils', fz + 1.6, 24);   // minzoom НЕ layout-свойство → нужен setLayerZoomRange (setLayoutProperty был no-op); сёла появляются ближе обзора
     updateZoutBtn(); applyPanLock();
   };
   map.once('idle', setupStart);
@@ -529,8 +531,8 @@ map.on('load', ()=>{
 // Рамка-выделение: Shift+перетаскивание
 map.boxZoom.disable();
 let bs=null, bsRect=null;
-map.on('mousedown', e=>{ if(!e.originalEvent.shiftKey){ boxDragged=false; return; } bs={x:e.point.x,y:e.point.y,ll:e.lngLat}; map.dragPan.disable(); });   // сбрасываем флаг на обычном mousedown: после рамки >3px нативный click не дублируется (clickTolerance) и флаг иначе залипает, глотая след. клик
-map.on('mousemove', e=>{ if(!bs) return; if(!bsRect){ bsRect=document.createElement('div'); document.body.appendChild(bsRect); } const x0=Math.min(bs.x,e.point.x),y0=Math.min(bs.y,e.point.y),w=Math.abs(e.point.x-bs.x),h=Math.abs(e.point.y-bs.y); const r=map.getCanvas().getBoundingClientRect(); bsRect.style.cssText='position:fixed;border:1px dashed #e8c547;background:rgba(232,197,71,.12);z-index:7;pointer-events:none;left:'+(r.left+x0)+'px;top:'+(r.top+y0)+'px;width:'+w+'px;height:'+h+'px'; });
+map.on('mousedown', e=>{ if(!e.originalEvent.shiftKey){ boxDragged=false; return; } bs={x:e.point.x,y:e.point.y,ll:e.lngLat,rect:map.getCanvas().getBoundingClientRect()}; map.dragPan.disable(); });   // rect холста кэшируем 1 раз на старте рамки; сбрасываем флаг на обычном mousedown (после рамки >3px нативный click не дублируется)
+map.on('mousemove', e=>{ if(!bs) return; if(!bsRect){ bsRect=document.createElement('div'); document.body.appendChild(bsRect); } const x0=Math.min(bs.x,e.point.x),y0=Math.min(bs.y,e.point.y),w=Math.abs(e.point.x-bs.x),h=Math.abs(e.point.y-bs.y); const r=bs.rect; bsRect.style.cssText='position:fixed;border:1px dashed #e8c547;background:rgba(232,197,71,.12);z-index:7;pointer-events:none;left:'+(r.left+x0)+'px;top:'+(r.top+y0)+'px;width:'+w+'px;height:'+h+'px'; });
 map.on('mouseup', async e=>{
   const start=bs, rect=bsRect; bs=null; bsRect=null; applyPanLock(); if(rect) rect.remove();
   if(!start) return;
@@ -633,15 +635,21 @@ document.getElementById('f-r').addEventListener('change', e=>{
 map.on('moveend', ()=>{ if(hasFine()) fineUpdate(); });
 
 // Подсветка участка под курсором — белая обводка (как mouseover в оригинале)
-let _hov=false;
+let _hov=false, _hovQ=false, _hovPt=null;
 map.on('mousemove', e=>{
   if(bs) return;                                   // во время Shift-рамки не подсвечиваем
-  const src=map.getSource('hover'); if(!src) return;
-  if(map.getZoom()<11.5){ if(_hov){ src.setData(EMPTY); _hov=false; } return; }
-  const lyrs=['parcels-fill','fine-fill'].filter(id=>map.getLayer(id));
-  const f=lyrs.length ? map.queryRenderedFeatures(e.point,{layers:lyrs}) : [];
-  if(f.length){ src.setData({type:'Feature',geometry:f[0].geometry,properties:{}}); _hov=true; map.getCanvas().style.cursor='pointer'; }
-  else if(_hov){ src.setData(EMPTY); _hov=false; map.getCanvas().style.cursor=''; }
+  _hovPt=e.point;
+  if(_hovQ) return;                                // не чаще кадра (queryRenderedFeatures — не на каждый пиксель)
+  _hovQ=true;
+  requestAnimationFrame(()=>{
+    _hovQ=false;
+    const src=map.getSource('hover'); if(!src) return;
+    if(bs || map.getZoom()<11.5){ if(_hov){ src.setData(EMPTY); _hov=false; } return; }
+    const lyrs=['parcels-fill','fine-fill'].filter(id=>map.getLayer(id));
+    const f=(lyrs.length && _hovPt) ? map.queryRenderedFeatures(_hovPt,{layers:lyrs}) : [];
+    if(f.length){ src.setData({type:'Feature',geometry:f[0].geometry,properties:{}}); _hov=true; map.getCanvas().style.cursor='pointer'; }
+    else if(_hov){ src.setData(EMPTY); _hov=false; map.getCanvas().style.cursor=''; }
+  });
 });
 map.on('mouseout', ()=>{ const src=map.getSource('hover'); if(src&&_hov){ src.setData(EMPTY); _hov=false; } });
 </script>
