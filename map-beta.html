@@ -134,7 +134,6 @@ const map = new maplibregl.Map({
   }
 });
 
-const zc = document.getElementById('zoomctl');
 const zoomStep = d => map.easeTo({ zoom: map.getZoom() + d, duration: 320, easing: t => t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2 });
 document.getElementById('zin').onclick  = () => zoomStep(+0.35);
 document.getElementById('zout').onclick = () => zoomStep(-0.35);
@@ -142,7 +141,7 @@ const zoutBtn = document.getElementById('zout');
 function updateZoutBtn(){ const dis=map.getZoom()<=map.getMinZoom()+0.05; zoutBtn.style.opacity=dis?'.3':''; zoutBtn.style.pointerEvents=dis?'none':''; }
 map.on('zoom', updateZoutBtn);
 // Технический блок в правом нижнем углу: живой зум + версия (бампить при каждом апдейте беты)
-const BUILD_VERSION='b1';
+const BUILD_VERSION='b2';
 const betaInfo=document.createElement('div'); betaInfo.id='betainfo'; document.body.appendChild(betaInfo);
 function updateBetaInfo(){ betaInfo.textContent='z '+map.getZoom().toFixed(2)+' · '+BUILD_VERSION; }
 map.on('zoom', updateBetaInfo); map.on('moveend', updateBetaInfo); updateBetaInfo();
@@ -329,28 +328,6 @@ map.on('mouseenter','parcels-fill',e=>{ map.getCanvas().style.cursor='pointer'; 
 map.on('mousemove','parcels-fill',e=>{ if(pfQueued) return; pfQueued=true; requestAnimationFrame(()=>{ pfQueued=false; prefetchNear(e.lngLat); }); });
 map.on('mouseleave','parcels-fill',()=>map.getCanvas().style.cursor='');
 
-// Зум так, чтобы в кадре было ~n ближайших НП (кликнутый — в центре)
-function fitNearestN(lng, lat, n){
-  const pts = CIDX.filter(c=>c.lat&&c.lon)
-    .map(c=>({c, d:(c.lat-lat)**2+(c.lon-lng)**2}))
-    .sort((a,b)=>a.d-b.d).slice(0, n).map(o=>o.c);
-  if(!pts.length){ map.easeTo({center:[lng,lat],duration:700,essential:true}); return; }
-  const rLon=Math.max(...pts.map(c=>Math.abs(c.lon-lng)));   // симметричная рамка вокруг кликнутого → он строго в центре
-  const rLat=Math.max(...pts.map(c=>Math.abs(c.lat-lat)));
-  const box=[[lng-rLon-.01,lat-rLat-.01],[lng+rLon+.01,lat+rLat+.01]];
-  const cam=map.cameraForBounds(box,{padding:40,maxZoom:14});
-  const z=Math.max(cam?cam.zoom:map.getZoom(), map.getZoom());   // кадрируем ровно N НП (drill 8→3→1 даёт приближение), не отдаляя
-  map.easeTo({center:[lng,lat], zoom:z, duration:700, essential:true});
-}
-// Прогрессивный drill по повторным кликам на ОДНО село: 1-й клик ~4 НП, 2-й — фикс zoom 12.5, 3-й — 1 (село по центру). Клик по другому селу / району — заново.
-let drillCode='', drillN=0; const DRILL_STEPS=[{n:4},{z:12.5},{n:1}];   // шаг: {n:кадр N сёл} или {z:фикс. зум}
-function drillVillage(lng, lat){
-  const nc=nearestCouncil(lng,lat).best, code=nc?nc.c:'_';
-  if(code===drillCode) drillN=Math.min(drillN+1, DRILL_STEPS.length-1); else { drillCode=code; drillN=0; }
-  const step=DRILL_STEPS[drillN];
-  if(step.z!=null) map.easeTo({center:[lng,lat], zoom:step.z, duration:700, essential:true});
-  else fitNearestN(lng, lat, step.n);
-}
 // Прогрессивный зум по повторным кликам на ОДИН НП: 11.5 → 13 → 14 → 14.5 → 15. Клик по ДРУГОМУ НП — прогрессия заново.
 const NP_ZOOM_SEQ=[11.5,13,14,14.5,15];
 let npKey='', npStep=0;
@@ -438,6 +415,7 @@ async function flyCad(cad){
     let sx=0,sy=0; ring.forEach(p=>{sx+=p[0];sy+=p[1];}); const cx=sx/ring.length, cy=sy/ring.length;
     map.jumpTo({center:[cx,cy], zoom:17});
     const rec=(await councilParcels(code)).find(p=>p.c===cad)||{c:cad};
+    _popupParcel={cad, geom:f.geometry, rec, cname:ruName(c.n)};   // чтобы кнопка «в подборку» в этом попапе работала
     new maplibregl.Popup({maxWidth:'320px'}).setLngLat([cx,cy]).setHTML(popupHTML(rec, ruName(c.n))).addTo(map);
     qres.innerHTML='';
   } else qres.innerHTML='<div class="qrow muted">участок не найден в совете</div>';
@@ -578,10 +556,9 @@ document.getElementById('bk-exp').onclick=()=>{
 
 // ── Тонкие фильтры (гибрид): при приближении грузим данные совета и показываем только подходящие ──
 const OTC2={'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n'};
-const fine={ mz:'', ct:'', ly:'', r:'' };  // межевание | категория | год аренды | арендатор
+const fine={ mz:'', ct:'', r:'' };  // межевание | категория | арендатор
 let RENTC={}, RENTERS=[];
-function hasFine(){ return !!(fine.mz||fine.ct||fine.ly||fine.r); }
-function matchLease(rec){ const y=rec.ey; if(fine.ly==='none') return !y; if(fine.ly==='expired') return y&&y<2026; if(fine.ly==='2030+') return y&&y>=2030; return y&&String(y)===fine.ly; }
+function hasFine(){ return !!(fine.mz||fine.ct||fine.r); }
 const FINE_MINZOOM=13;
 function fineHint(t){ const el=document.getElementById('fine-hint'); if(!el) return; el.textContent=t||''; el.style.display=t?'block':'none'; }
 let fineRun=false, finePend=false;
@@ -607,7 +584,7 @@ async function fineUpdate(){
     do{
       finePend=false;
       setRazmezh(fine.mz);
-      const otherFine = !!(fine.ct||fine.ly||fine.r);   // эти фильтры требуют поучастковых данных → порог z13
+      const otherFine = !!(fine.ct||fine.r);   // эти фильтры требуют поучастковых данных → порог z13
       // Только межевание (или ничего) — работает на любом зуме через глобальный razmezh, без подсказки
       if(!otherFine){
         map.getSource('fine')&&map.getSource('fine').setData(EMPTY); fineHint('');
@@ -629,7 +606,6 @@ async function fineUpdate(){
           const oc=OTC2[rec.ot]||'n';
           if(!ownActive.has(oc)) continue;
           if(fine.ct && rec.ct!==fine.ct) continue;
-          if(fine.ly && !matchLease(rec)) continue;
           if(fine.r && !(rec.r && rec.r.toLowerCase().includes(fine.r.toLowerCase()))) continue;
           if(fine.mz==='yes' && !rec.mz) continue;
           if(fine.mz==='no' && rec.mz) continue;

@@ -525,6 +525,7 @@ function flyOverview(animate) {   // обзор для ОБЕИХ плашек: 
   const z = (isFinite(Z_PARAM) && Z_PARAM > 0) ? Z_PARAM : overviewZoom();
   if (animate) map.flyTo(OVERVIEW_CENTER, z, { duration: 0.6 });
   else map.setView(OVERVIEW_CENTER, z, { animate: false });
+  clickStep = 0; clickRaion = '';   // на обзоре прогрессия кликов по НП — заново
 }
 // ── Лок карты: мин-зум ~8.5 (подгон под экран) + границы региона (за края не уехать ни на каком зуме) ──
 const MIN_ZOOM_BASE = 8.5;                                              // мин-зум на эталонном экране ~1440px (дальше отдалять нельзя)
@@ -538,7 +539,6 @@ window.addEventListener('resize', applyMapLock);                       // под
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
-const parcelGeomIndex = {};      // cadnum → feature (for popups)
 let polygonsVisible = true;
 
 // Группировка близких маркеров; в пузырьке — сумма участков, разворачиваются при приближении.
@@ -578,6 +578,11 @@ async function ensureCouncilParcels(council) {
   const result = await council._loading;
   delete council._loading;
   return result;
+}
+// Ленивый индекс cadnum→участок совета (строится 1 раз) — чтобы parcelStyle не делал O(n) .find на КАЖДЫЙ участок (было O(n²) на построение слоя)
+function byCad(council) {
+  if (!council._byCad && council.parcels) council._byCad = new Map(council.parcels.map(p => [p.c, p]));
+  return council._byCad || null;
 }
 
 let activePolyCode = null;
@@ -666,7 +671,8 @@ async function addCouncilView(code) {
 
 function parcelStyle(f, council) {
   const cad = f.properties.cadnum;
-  const data = council ? council.parcels.find(p => p.c === cad) : null;
+  const idx = council ? byCad(council) : null;
+  const data = idx ? idx.get(cad) : null;   // O(1) вместо линейного .find на каждый участок
   // При активном фильтре показываем только подходящие участки, остальные прячем
   if (hasAnyFilter() && !(data && parcelMatchesFilters(data, council ? council.region : ''))) {
     return { stroke: false, fill: false };
@@ -737,12 +743,6 @@ function buildParcelPopup(cad, data, council) {
     </div>`;
 }
 
-function togglePolygons() {
-  polygonsVisible = !polygonsVisible;
-  Object.values(polygonLayers).forEach(l => {
-    if (polygonsVisible) l.addTo(map); else map.removeLayer(l);
-  });
-}
 // Базовые слои.  OSM (со своими подписями) — обычный режим; CARTO *nolabels* — в режиме подписей НП «Вся карта» (как на бете)
 const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 const CARTO_DARK_NL = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
@@ -940,7 +940,6 @@ function showOwnTable(p) { if (p.o) showTable([p.lat, p.lon], ownTableHTML(p)); 
 function showRaionTable(p) { const rname = RAION_BY_PREFIX[p.rpfx]; if (rname) showTable([p.lat, p.lon], raionTableHTML(rname)); }
 
 // Наведение в ОБЛАСТЬ НП на ЛЮБОМ зуме: по карте ищем ближайший НП и показываем его табличку у курсора (не только на подписи)
-function nearestCouncil(lng, lat) { let best = null, bd = 1e9; for (const c of CIDX) { const d = (c.lat - lat) ** 2 + (c.lon - lng) ** 2; if (d < bd) { bd = d; best = c; } } return { best, bd }; }
 let lastHoverCode = '';
 function mapAreaHover(latlng, ev) {
   // ближайший НП СРЕДИ ВИДИМЫХ подписей (labelByCode)
@@ -1206,7 +1205,6 @@ let filterOwnership = new Set();
 let ownMode = 'council';
 const ownRegionLayers = {};   // ot → L.geoJSON (региональный слой, lazy)
 const OWN_FILE = { 'Державна власність': 'own_gos', 'Комунальна власність': 'own_kom', 'Не визначено': 'own_nedef' };
-const OWN_PRIVATE = 'Приватна власність';   // частную по всей области не показываем (≈440к участков)
 let filterCategory = '';
 let filterRegion = '';
 let filterLeaseYear = '';
@@ -1247,9 +1245,6 @@ function hasAnyFilter() {
   return !!(filterRenter || filterOwnership.size > 0 || filterCategory || filterRegion || filterLeaseYear || filterMz);
 }
 
-function getFilteredCount(council) {
-  return getFilteredStats(council).count;
-}
 
 // число размежёванных (РФ кадастр) участков по коду совета — для агрегатного подсчёта filterMz
 const MZ_COUNT={"6522186500":4,"6522381000":25,"6522310100":6,"6521555100":20,"6524455100":32,"6525455100":30,"6522384300":7,"6522386000":16,"6523585500":67,"6523555100":28,"6522682500":3,"6523586000":52,"6524455500":1,"6522384000":31,"6524481500":2,"6510745300":118,"6524480400":23,"6524480500":50,"6522155400":1,"6522380500":101,"6510790800":66,"6522187500":12,"6523582700":41,"6522385000":91,"6522655100":10,"6523580500":66,"6523583800":30,"6522183000":7,"6524485000":30,"6523583500":27,"6522382500":67,"6525455300":30,"6524784500":4,"6524484000":12,"6522383900":75,"6523287700":3,"6522181500":57,"6522683500":2,"6521583300":13,"6523585000":20,"6525483100":4,"6522384200":42,"6522382000":21,"6523880500":37,"6525480500":8,"6523884500":26,"6525481000":13,"6522383000":31,"6524785000":1,"6523580700":62,"6523584000":61,"6525484700":13,"6521584400":7,"6523586500":3,"6523581500":14,"6522383800":23,"6525481300":5,"6522383200":38,"6523881000":14,"6523883300":4,"6525483000":24,"6522385500":18,"6525483500":4,"6524784900":7,"6524484500":2,"6523584500":45,"6522383400":9,"6525484000":21,"6523884000":1,"6522385400":12,"6522680500":15,"6524482000":5,"6523882500":1,"6523883000":1,"6524480200":16,"6523581000":18,"6524483800":32,"6522682000":7,"6524482200":5,"6523581800":15,"6522384500":164,"6524481000":15,"6523584700":19,"6524481300":1,"6521586000":5,"6523882000":1,"6523881500":14,"6525483800":18,"6522380200":26,"6524481700":5,"6522684000":10,"6522385300":5,"6523883500":10,"6522683300":4,"6523582000":12,"6521581100":16,"6522685000":1,"6523880200":3,"6523880400":17,"6522981500":6,"6524481800":6,"6523583000":4,"6523582500":60,"6522381500":11,"6523583600":14};
@@ -1310,31 +1305,6 @@ function getFilteredStats(council) {
 function fmt(n) { return Number(n).toLocaleString('ru'); }
 
 // ── Режим «вся карта»: показ участков выбранной формы собственности по всей области ──
-async function showOwnRegion(ot) {
-  const key = OWN_FILE[ot];
-  if (!key) return;
-  if (!ownRegionLayers[ot]) {
-    try {
-      const resp = await fetch(`${key}.geojson`);
-      if (!resp.ok) return;
-      const fcoll = await resp.json();
-      const lyr = L.geoJSON(fcoll, {
-        smoothFactor: 2,
-        style: { color: ownColor(ot), weight: 0.6, fillColor: ownColor(ot), fillOpacity: 0.5 }
-      });
-      lyr.on('click', e => {        // делегирование на весь слой (без обработчиков на каждом из десятков тысяч участков)
-        if (map.getZoom() < 12.0) return;   // ниже z12.0 — только статичный приблизительный цвет; на сами полигоны (клик/детали) переключаемся с z12.0
-        const l = e.layer, f = l.feature, cad = f.properties.cadnum;
-        if (e.originalEvent && e.originalEvent.shiftKey) { basketToggle(cad); L.DomEvent.stopPropagation(e); return; }
-        const council = COUNCILS.find(c => c.code === cad.slice(0, 10));
-        l.bindPopup(buildParcelPopup(cad, { c: cad, a: f.properties.a, ot: f.properties.ot }, council)).openPopup();
-      });
-      ownRegionLayers[ot] = lyr;
-    } catch (e) { return; }
-  }
-  if (ownMode !== 'all') return;   // режим мог смениться, пока грузилось
-  if (!map.hasLayer(ownRegionLayers[ot])) ownRegionLayers[ot].addTo(map);
-}
 function hideOwnRegion(ot) {
   if (ownRegionLayers[ot] && map.hasLayer(ownRegionLayers[ot])) map.removeLayer(ownRegionLayers[ot]);
 }
@@ -1383,6 +1353,7 @@ function buildMarkers() {
   markers = {};
 
   const hasFilter = hasAnyFilter();
+  const ttMobile = window.matchMedia('(max-width: 768px)').matches;   // одно вычисление на весь проход, не на каждый совет
   let totalCount = 0, totalArea = 0;
 
   COUNCILS.forEach(c => {
@@ -1403,7 +1374,6 @@ function buildMarkers() {
     const ttArea = hasFilter
       ? `${fmt(fs.area)} / ${fmt(c.area)} га`
       : `${fmt(c.area)} га`;
-    const ttMobile = window.matchMedia('(max-width: 768px)').matches;
     m.bindTooltip(`<div class="pname">${escapeHtml(ruName(c.name))}</div><div class="praion">${raionOf(c.code)}</div><div class="pstats">${fs.count} участков · ${ttArea}</div>`, {
       // на мобиле — снизу (название не срезается верхним краем при тапе/зуме), на десктопе — сверху
       direction: ttMobile ? 'bottom' : 'top', offset: [0, ttMobile ? sz/2 : -sz/2], opacity: 0.95
@@ -1508,7 +1478,7 @@ async function showDetail(code) {
       <h4>Арендаторы (${c.top_renters.length})</h4>
       <div class="bar-list" style="max-height:220px;overflow-y:auto;padding-right:4px">
         ${c.top_renters.map(([k,v])=>`
-          <div class="bar-row" style="cursor:pointer" onclick="selectRenter(${JSON.stringify(k)})">
+          <div class="bar-row" style="cursor:pointer" onclick="selectRenter(${escapeHtml(JSON.stringify(k))})">
             <span class="name">${escapeHtml(k)}</span>
             <span class="count">${v}</span>
           </div>
@@ -1552,43 +1522,7 @@ async function showDetail(code) {
   `;
 }
 
-function renderParcelCard(p) {
-  const expClass = p.ey && p.ey < 2026 ? 'style="color:var(--red)"'
-                  : p.ey && p.ey <= 2027 ? 'style="color:var(--orange)"'
-                  : '';
-  return `
-    <div class="parcel">
-      <span class="cad" onclick="navigateToParcel('${p.c}')">${p.c}</span>
-      <span class="area">${p.a} га</span>
-      ${p.r ? `<div class="field"><span class="label">аренд.: </span><span class="val">${escapeHtml(p.r)}</span></div>` : ''}
-      ${p.o ? `<div class="field"><span class="label">собств.: </span><span class="val">${escapeHtml(p.o)}${p.oc>1?` <span style="color:var(--muted)">(+${p.oc-1} совладельца)</span>`:''}</span></div>` : ''}
-      ${p.oi ? `<div class="field"><span class="label">ІПН собств.: </span><span class="val" style="font-family:'IBM Plex Mono',monospace">${escapeHtml(p.oi)}</span></div>` : ''}
-      ${p.od ? `<div class="field"><span class="label">право зарег.: </span><span class="val">${p.od}</span></div>` : ''}
-      ${p.ed ? `<div class="field"><span class="label">договор: </span><span class="val" ${expClass}>до ${p.ed}${p.cn?` · №${escapeHtml(p.cn)}`:''}${p.ra?` · ${p.ra} грн`:''}${p.np?` · ${p.np}% НГО`:''}</span></div>` : ''}
-      ${p.re ? `<div class="field"><span class="label">ЄДРПОУ аренд.: </span><span class="val" style="font-family:'IBM Plex Mono',monospace">${escapeHtml(p.re)}</span></div>` : ''}
-      ${p.ad ? `<div class="field"><span class="label">адр.: </span><span class="val">${escapeHtml(p.ad)}</span></div>` : ''}
-    </div>`;
-}
 
-function loadMoreParcels() {
-  const parcels = window._curParcels || [];
-  const prev = window._curShown || 0;
-  const next = Math.min(prev + 300, parcels.length);
-  const btn = document.getElementById('parcel-more');
-  const head = document.getElementById('parcel-list-head');
-  // Insert new cards before the button
-  const html = parcels.slice(prev, next).map(renderParcelCard).join('');
-  btn.insertAdjacentHTML('beforebegin', html);
-  window._curShown = next;
-  // Update or remove the button
-  if (next >= parcels.length) {
-    btn.remove();
-    head.textContent = head.textContent.replace(/ — показано .*$/, ` (${parcels.length})`);
-  } else {
-    btn.textContent = `Показать ещё ${Math.min(300, parcels.length - next)} из ${parcels.length - next}`;
-    head.textContent = head.textContent.replace(/показано \d+ из \d+/, `показано ${next} из ${parcels.length}`);
-  }
-}
 
 function escapeHtml(s) {
   if (!s) return '';
@@ -1686,58 +1620,6 @@ async function downloadXlsx(rows, filename, sheetName) {
   XLSX.writeFile(wb, filename);
 }
 
-async function exportFiltered() {
-  const btn = document.getElementById('btn-export-all');
-  const origText = btn.textContent;
-  try {
-    // Determine which councils to load
-    let targetCouncils;
-    if (filterRenter && RENTER_COUNCILS[filterRenter]) {
-      targetCouncils = COUNCILS.filter(c => RENTER_COUNCILS[filterRenter].includes(c.code));
-    } else if (filterRegion) {
-      targetCouncils = COUNCILS.filter(c => c.region === filterRegion);
-    } else {
-      if (!confirm(`Внимание: фильтр не выбран. Будет ~600k участков (Excel может зависнуть). Лучше выбрать арендатора/регион. Всё равно экспортировать?`)) {
-        btn.textContent = origText; btn.disabled = false; return;
-      }
-      targetCouncils = COUNCILS;
-    }
-    btn.disabled = true;
-    btn.textContent = `Загрузка...`;
-    const need = targetCouncils.filter(c => !c.parcels);
-    if (need.length > 0) {
-      let loaded = 0;
-      for (let i=0; i<need.length; i+=10) {
-        await Promise.all(need.slice(i, i+10).map(c => ensureCouncilParcels(c)));
-        loaded += Math.min(10, need.length - i);
-        btn.textContent = `Загрузка ${loaded}/${need.length}…`;
-      }
-    }
-    btn.textContent = 'Формирую Excel...';
-  const rows = [];
-  for (const c of targetCouncils) {
-    for (const p of (c.parcels || [])) {
-      if (parcelMatchesFilters(p, c.region)) rows.push(parcelsToRows([p], c)[0]);
-    }
-  }
-  const stamp = new Date().toISOString().slice(0,10);
-  let suffix = 'все';
-  const tags = [];
-  if (filterRegion) tags.push('рег_' + filterRegion);
-  if (filterRenter) tags.push('аренд_' + filterRenter.slice(0,30).replace(/[^а-яА-Яa-zA-Z0-9]/g,'_'));
-  if (filterOwnership.size > 0) tags.push('собств_' + Array.from(filterOwnership).join('_').slice(0,40).replace(/[^а-яА-Яa-zA-Z0-9]/g,'_'));
-  if (filterCategory) tags.push('кат_' + filterCategory.slice(0,30).replace(/[^а-яА-Яa-zA-Z0-9]/g,'_'));
-  if (filterLeaseYear) tags.push('год_' + filterLeaseYear);
-  if (tags.length) suffix = tags.join('__');
-  downloadXlsx(rows, `Кадастр_${suffix}_${stamp}.xlsx`, 'Участки');
-  } catch (e) {
-    alert('Ошибка экспорта: ' + (e.message || e));
-    console.error(e);
-  } finally {
-    btn.textContent = origText;
-    btn.disabled = false;
-  }
-}
 
 async function exportCouncil(code) {
   const c = COUNCILS.find(x => x.code === code);
@@ -1760,7 +1642,7 @@ function renderRentersList(query) {
   if (!tr) return;   // блок «Все арендаторы» убран из меню
   document.getElementById('renters-count').textContent = list.length + (q ? ` / ${STATS.top_renters.length}` : '');
   tr.innerHTML = list.map(([k,v])=>`
-    <div class="bar-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:5px 0;font-size:11px;cursor:pointer;border-bottom:1px dotted var(--border);line-height:1.35" onclick="selectRenter(${JSON.stringify(k)})">
+    <div class="bar-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:5px 0;font-size:11px;cursor:pointer;border-bottom:1px dotted var(--border);line-height:1.35" onclick="selectRenter(${escapeHtml(JSON.stringify(k))})">
       <span class="name" style="flex:1;color:var(--text);word-break:break-word">${escapeHtml(k)}</span>
       <span class="count" style="font-family:'IBM Plex Mono',monospace;color:var(--accent);min-width:36px;text-align:right;flex-shrink:0">${v}</span>
     </div>
@@ -2197,7 +2079,7 @@ search.addEventListener('input', e => {
       </div>
     `).join('') || '<div class="item" style="color:var(--muted)">Сельсовет не найден</div>';
     sr.style.display = 'block';
-    sr.querySelectorAll('.item').forEach((el,i) => {
+    sr.querySelectorAll('.item[data-i]').forEach((el,i) => {   // плашка «не найден» без data-i → не кликается (иначе matches[i] undefined → падение)
       el.addEventListener('click', () => {
         const c = matches[i];
         focusCouncil(c.code);
@@ -2294,7 +2176,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v19';
+const BUILD_VERSION = 'v20';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
