@@ -12,7 +12,6 @@
 <link rel="dns-prefetch" href="https://b.tile.openstreetmap.org"/>
 <link rel="dns-prefetch" href="https://c.tile.openstreetmap.org"/>
 <link rel="dns-prefetch" href="https://server.arcgisonline.com"/>
-<link rel="dns-prefetch" href="https://cdn.sheetjs.com"/>
 <title>Кадастровая карта — Херсонская область</title>
 <link rel="icon" href="favicon.ico" sizes="any"/>
 <link rel="icon" type="image/png" href="favicon-32.png" sizes="32x32"/>
@@ -1583,7 +1582,7 @@ function loadXlsx() {
   if (window.XLSX) return Promise.resolve();
   if (!_xlsxPromise) _xlsxPromise = new Promise((res, rej) => {
     const s = document.createElement('script');
-    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+    s.src = 'xlsx.full.min.js';   // самохостинг (SheetJS 0.20.1) — работает без доступа к CDN
     s.onload = res;
     s.onerror = () => { _xlsxPromise = null; rej(new Error('xlsx load failed')); };
     document.head.appendChild(s);
@@ -1601,7 +1600,10 @@ async function downloadXlsx(rows, filename, sheetName) {
     }
     return;
   }
-  try { await loadXlsx(); } catch (e) { alert('Не удалось загрузить модуль экспорта Excel. Проверьте интернет и повторите.'); return; }
+  try { await loadXlsx(); } catch (e) {
+    if (confirm('Не удалось загрузить модуль Excel. Скачать в CSV (открывается в Excel)?')) downloadCsv(rows, filename.replace(/\.xlsx$/, '.csv'));
+    return;
+  }
   const ws = XLSX.utils.json_to_sheet(rows);
   const widths = {
     'Кадастровый номер (УКР)': 24, 'Кадастровый номер (РФ)': 24, 'Площадь, га': 12, 'Регион': 12,
@@ -2174,7 +2176,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v24';
+const BUILD_VERSION = 'v25';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
