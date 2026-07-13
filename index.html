@@ -364,7 +364,8 @@
       <h3>📌 Подборка: <span id="basket-count" style="color:var(--accent)">0</span> участков</h3>
       <textarea id="basket-input" placeholder="Вставьте кадастры через перенос строки или запятую — добавятся в подборку" rows="3" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;resize:vertical;margin-bottom:6px"></textarea>
       <button id="btn-basket-add" class="btn-export" style="margin-bottom:4px">Добавить в подборку</button>
-      <button id="btn-basket-export" class="btn-export" style="background:var(--green);color:#fff;border-color:var(--green);margin-bottom:4px">📥 Выгрузить подборку</button>
+      <button id="btn-basket-export" class="btn-export" style="background:var(--green);color:#fff;border-color:var(--green);margin-bottom:4px">📥 Выгрузить подборку (Excel)</button>
+      <button id="btn-basket-export-csv" class="btn-export" style="background:var(--green);color:#fff;border-color:var(--green);margin-bottom:4px">📄 Выгрузить подборку (CSV)</button>
       <button id="btn-basket-clear" class="btn-reset" style="margin-bottom:0;border-color:var(--accent);color:var(--accent)">Очистить подборку</button>
       <div style="color:var(--muted);font-size:10px;margin-top:6px">Shift+клик по участку — добавит/уберёт · Shift+рамка мышкой — добавить все участки в области</div>
     </div>
@@ -1446,6 +1447,7 @@ async function showDetail(code) {
           </div>
         </div>
         <button class="btn-export-sm" onclick="exportCouncil('${c.code}')">📥 Excel</button>
+        <button class="btn-export-sm" onclick="exportCouncil('${c.code}','csv')">📄 CSV</button>
       </div>
     </div>
 
@@ -1532,12 +1534,14 @@ function openCadastr(cad) {
 }
 
 function parcelsToRows(parcels, council) {
+  const _np = nameParts(council.name);                          // «укр (рус)» → {ru, ua}
+  const _sovet = _np.ua ? `${_np.ru} (${_np.ua})` : _np.ru;     // русское в приоритете, украинское в скобках
   return parcels.map(p => ({
     'Кадастровый номер (УКР)': p.c,
     'Кадастровый номер (РФ)': p.mz || '',
     'Площадь, га': p.a,
     'Регион': council.region || '',
-    'Сельсовет': council.name,
+    'Сельсовет': _sovet,
     'Код сельсовета': council.code,
     'Форма собственности': ruOwn(p.ot || ''),
     'Категория земель': catRu(p.ct),
@@ -1621,7 +1625,7 @@ async function downloadXlsx(rows, filename, sheetName) {
 }
 
 
-async function exportCouncil(code) {
+async function exportCouncil(code, fmt) {
   const c = COUNCILS.find(x => x.code === code);
   if (!c) return;
   await ensureCouncilParcels(c);
@@ -1629,7 +1633,8 @@ async function exportCouncil(code) {
   const rows = parcelsToRows(parcels, c);
   const stamp = new Date().toISOString().slice(0,10);
   const safe = c.name.replace(/[^а-яА-Яa-zA-Z0-9]/g,'_');
-  downloadXlsx(rows, `${safe}_${stamp}.xlsx`, c.name.slice(0,30));
+  if (fmt === 'csv') downloadCsv(rows, `${safe}_${stamp}.csv`);           // CSV — мгновенно, без загрузки модуля Excel
+  else downloadXlsx(rows, `${safe}_${stamp}.xlsx`, c.name.slice(0,30));
 }
 
 // Sidebar stats
@@ -1774,6 +1779,7 @@ function renderBasketPanel() {
         <h2>📌 Подборка</h2>
         ${items.length ? `<div style="display:flex;gap:6px;flex-shrink:0">
           <button class="btn-export-sm" onclick="document.getElementById('btn-basket-export').click()">📥 Excel</button>
+          <button class="btn-export-sm" onclick="document.getElementById('btn-basket-export-csv').click()">📄 CSV</button>
           <button class="btn-export-sm" title="Очистить подборку" onclick="document.getElementById('btn-basket-clear').click()" style="background:#ff6f61;color:#fff">✕ Сброс</button>
         </div>` : ''}
       </div>
@@ -1895,9 +1901,9 @@ document.getElementById('btn-basket-clear').addEventListener('click', () => {
   basket.clear();
   basketUpdate();
 });
-document.getElementById('btn-basket-export').addEventListener('click', async () => {
+async function exportBasket(fmt, btn) {
   if (basket.size === 0) { alert('Подборка пуста'); return; }
-  const btn = document.getElementById('btn-basket-export');
+  btn = btn || document.getElementById('btn-basket-export');
   const orig = btn.textContent;
   btn.disabled = true;
   try {
@@ -1929,7 +1935,8 @@ document.getElementById('btn-basket-export').addEventListener('click', async () 
       }
     }
     const stamp = new Date().toISOString().slice(0,10);
-    downloadXlsx(rows, `Подборка_${rows.length}_${stamp}.xlsx`, 'Подборка');
+    if (fmt === 'csv') downloadCsv(rows, `Подборка_${rows.length}_${stamp}.csv`);
+    else downloadXlsx(rows, `Подборка_${rows.length}_${stamp}.xlsx`, 'Подборка');
     if (missing > 0) console.log(`${missing} кадастров не найдены в базе — вписаны пустые строки`);
   } catch (e) {
     alert('Ошибка: ' + (e.message || e));
@@ -1938,7 +1945,9 @@ document.getElementById('btn-basket-export').addEventListener('click', async () 
     btn.textContent = orig;
     btn.disabled = false;
   }
-});
+}
+document.getElementById('btn-basket-export').addEventListener('click', e => exportBasket('xlsx', e.currentTarget));
+document.getElementById('btn-basket-export-csv').addEventListener('click', e => exportBasket('csv', e.currentTarget));
 
 document.getElementById('btn-reset').addEventListener('click', () => {
   filterRenter = filterCategory = filterRegion = filterLeaseYear = filterMz = '';
@@ -2176,7 +2185,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v25';
+const BUILD_VERSION = 'v27';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
