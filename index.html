@@ -1758,6 +1758,11 @@ function renderBasketPanel() {
   det.classList.remove('detail-empty');
   const items = [...basket].reverse();   // последние добавленные — сверху списка
   const CAP = 300, shown = items.slice(0, CAP);
+  // Подгрузить данные советов (с площадью `a`) для участков подборки — в «Вся карта» Shift+клик грузит только геометрию,
+  // поэтому площади/итог по га без этого пусты. Подгрузили → перерисовали с корректной суммой.
+  const need = [...new Set(items.map(c => c.slice(0, 10)))]
+    .map(code => COUNCILS.find(x => x.code === code)).filter(c => c && !c.parcels && !c._loading);
+  if (need.length) Promise.all(need.map(c => ensureCouncilParcels(c))).then(() => { if (basketView) renderBasketPanel(); });
   // индекс площадей по советам (каждый совет индексируется один раз)
   const idxCache = {};
   const recOf = cad => {
@@ -2185,7 +2190,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v27';
+const BUILD_VERSION = 'v28';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
