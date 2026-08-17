@@ -285,7 +285,11 @@
   .rt-hover-pop .leaflet-popup-content { margin: 7px 9px; }
   .rt-hover-pop .leaflet-popup-tip { background: #fff; }
   /* Технический блок (зум + версия) — правый нижний угол */
-  #techinfo { position: fixed; right: 8px; bottom: 8px; z-index: 1200; pointer-events: none; font: 11px/1.2 'IBM Plex Mono', monospace; color: rgba(255,255,255,0.6); background: rgba(15,17,23,0.62); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 3px 7px; letter-spacing: .3px; white-space: nowrap; }
+  #techinfo { position: fixed; right: 10px; bottom: 10px; z-index: 1200; pointer-events: none;
+             font: 600 12px/1.2 'IBM Plex Mono', monospace; color: #ffd873;
+             background: rgba(10,12,18,0.88); border: 1px solid rgba(255,216,115,0.45);
+             border-radius: 5px; padding: 5px 9px; letter-spacing: .4px; white-space: nowrap;
+             box-shadow: 0 2px 8px rgba(0,0,0,.5); }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -1190,7 +1194,7 @@ document.getElementById('ly-rf').addEventListener('change', e => toggleRfLayer('
 document.getElementById('ly-bld').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
 // Кнопка «Показать Геническ»: включает всё нужное и переносит вид на квартал
 document.getElementById('rf-goto').addEventListener('click', () => {
-  map.setView([46.1745, 34.8065], 16);
+  map.setView([46.1745, 34.8065], 17);   // z17 — с этого зума видны ВСЕ слои, включая здания
   const ua = document.getElementById('ly-ua');
   if (!ua.checked) { ua.checked = true; applyUaLayer(true); }
   loadCouncilPolygons('6522110100');   // укр. участки рисуются только для ОТКРЫТОГО села
@@ -2418,7 +2422,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v42';
+const BUILD_VERSION = 'v43';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
