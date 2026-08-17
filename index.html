@@ -241,6 +241,11 @@
   .fullmap-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15,17,23,0.92); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 12px; border-radius: 6px; pointer-events: none; display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
   .fullmap-hint.show { display: block; }
   /* Подписи городов/сёл в режиме «Полная карта» */
+  .pop-scroll::-webkit-scrollbar { width: 7px; }
+  .pop-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; }
+  .pop-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: 4px; }
+  .pop-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+  .pop-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
   .leaflet-tooltip.council-label { background: rgba(15,17,23,0.74); color: #fff; border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.55); font: 600 11px 'IBM Plex Sans', sans-serif; padding: 1px 6px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.85); }
   .leaflet-tooltip.council-label.town { color: var(--accent); font-size: 12.5px; font-weight: 700; padding: 2px 8px; }
   .leaflet-tooltip.council-label.capital { color: var(--accent); font-size: 14.5px; font-weight: 800; letter-spacing: .3px; padding: 3px 10px; }
@@ -686,15 +691,16 @@ function parcelStyle(f, council) {
   const cad = f.properties.cadnum;
   const idx = council ? byCad(council) : null;
   const data = idx ? idx.get(cad) : null;   // O(1) вместо линейного .find на каждый участок
-  // При активном фильтре показываем только подходящие участки, остальные прячем
-  if (hasAnyFilter() && !(data && parcelMatchesFilters(data, council ? council.region : ''))) {
-    return { stroke: false, fill: false };
+  // При активном фильтре подходящие ПОДСВЕЧИВАЕМ (яркая белая обводка), остальные ГАСИМ — но не прячем,
+  // чтобы был виден контекст квартала (раньше не подходящие исчезали совсем)
+  const filtering = hasAnyFilter();
+  const match = !filtering || (data && parcelMatchesFilters(data, council ? council.region : ''));
+  let fill = data ? ownColor(data.ot) : '#3a3f55';
+  if (filtering && !match) {
+    return { stroke: true, fill: true, fillColor: fill, color: '#2a2f3a', weight: 0.4, fillOpacity: 0.07, opacity: 0.35 };
   }
-  let fill = '#888';
-  if (data) {
-    fill = ownColor(data.ot);
-  } else {
-    fill = '#3a3f55';
+  if (filtering && match) {   // найденное — яркая обводка поверх обычной заливки
+    return { stroke: true, fill: true, fillColor: fill, color: '#ffffff', weight: 2, fillOpacity: 0.75, opacity: 1 };
   }
   // Межевание сделано → толстая фиолетовая обводка
   if (data && data.mz) {
@@ -773,6 +779,29 @@ function rfCardHTML(rfCad, attrs) {
       ${kvHTML('адрес', a.ad, '#cfd6e4')}
     </div>`;
 }
+// Карточка здания (янтарная рамка)
+function bldCardHTML(cad) {
+  const b = (RFM && RFM.b && RFM.b[cad]) || {};
+  return `<div style="margin-top:6px;padding:6px 9px;background:rgba(240,192,74,.08);border:1px solid #f0c04a;border-radius:4px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#f0c04a;font-weight:600">${escapeHtml(cad)}</span>
+        ${copyBtn(cad, 'Скопировать кадастр здания')}
+      </div>
+      ${b.m2 != null ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">площадь</span><span style="flex:1">${b.m2.toLocaleString('ru')} м²</span></div>` : ''}
+      ${kvHTML('назначение', b.n)}
+      ${kvHTML('адрес', b.ad, '#cfd6e4')}
+    </div>`;
+}
+// Блок «Здания на участке» — по нашему ИЛИ по РФ-кадастру
+function bldBlockHTML(parcelCad) {
+  if (!RFM || !RFM.p2b) return '';
+  const ids = RFM.p2b[parcelCad];
+  if (!ids || !ids.length) return '';
+  return `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:7px">
+      <div style="color:#f0c04a;font-weight:600;font-size:11px;letter-spacing:.02em">🏠 ЗДАНИЯ НА УЧАСТКЕ — ${ids.length}</div>
+      ${ids.map(bldCardHTML).join('')}
+    </div>`;
+}
 // Карточка украинского кадастра (жёлтая рамка)
 function uaCardHTML(uaCad, d, council) {
   return `<div style="margin-top:6px;padding:7px 9px;background:rgba(232,197,71,.09);border:1px solid #e8c547;border-radius:4px">
@@ -809,17 +838,24 @@ function rfBlockForUa(cad) {
 }
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
-  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:8px;width:100%;padding:5px 10px;background:${inBasket?'#ff6f61':'var(--accent)'};color:#1a1a1a;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
-  // адрес для шапки: из РФ-данных (там он структурный и полный), иначе — из наших
+  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:8px;width:100%;padding:5px 10px;background:${inBasket?'#ff6f61':'var(--accent)'};color:#1a1a1a;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;flex:0 0 auto">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
   const kids = (RFM && RFM.ua2rf[cad]) || [];
   const rfAddr = kids.length && RFM.rf[kids[0]] ? RFM.rf[kids[0]].ad : '';
-  const head = cardHeadHTML(rfAddr || (data && data.ad) || '',
-    [council ? ruName(council.name) : '', raionOf(cad)].filter(Boolean).join(' · '));
-  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45">
-      ${head}
-      <div style="margin-top:7px"><div style="color:#e8c547;font-weight:600;font-size:11px;letter-spacing:.02em">🇺🇦 УКРАИНСКИЙ КАДАСТР</div>
-      ${uaCardHTML(cad, data, council)}</div>
-      ${rfBlockForUa(cad)}
+  // здания: сначала по нашему кадастру, иначе — собранные по дочерним РФ-участкам
+  let bld = bldBlockHTML(cad);
+  if (!bld && kids.length && RFM.p2b) {
+    const ids = [...new Set(kids.flatMap(k => RFM.p2b[k] || []))];
+    if (ids.length) bld = `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:7px">
+      <div style="color:#f0c04a;font-weight:600;font-size:11px;letter-spacing:.02em">🏠 ЗДАНИЯ НА УЧАСТКЕ — ${ids.length}</div>${ids.map(bldCardHTML).join('')}</div>`;
+  }
+  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45;display:flex;flex-direction:column;max-height:min(70vh,520px)">
+      <div style="flex:0 0 auto">${cardHeadHTML(rfAddr || (data && data.ad) || '', [council ? ruName(council.name) : '', raionOf(cad)].filter(Boolean).join(' · '))}</div>
+      <div class="pop-scroll" style="overflow-y:auto;flex:1 1 auto;min-height:0;padding-right:3px">
+        <div style="margin-top:5px"><div style="color:#e8c547;font-weight:600;font-size:11px;letter-spacing:.02em">🇺🇦 УКРАИНСКИЙ КАДАСТР</div>
+        ${uaCardHTML(cad, data, council)}</div>
+        ${rfBlockForUa(cad)}
+        ${bld}
+      </div>
       ${basketBtn}
     </div>`;
 }
@@ -960,11 +996,14 @@ function uaCardForRf(rfCad) {
 function rfPopup(p) {
   const uaCad = RFM ? RFM.rf2ua[p.cad] : null;
   const c = uaCad ? COUNCILS.find(x => x.code === uaCad.slice(0, 10)) : null;
-  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45">
-      ${cardHeadHTML(p.ad || '', [c ? ruName(c.name) : '', uaCad ? raionOf(uaCad) : ''].filter(Boolean).join(' · '))}
-      <div style="margin-top:7px"><div style="color:#ff6b6b;font-weight:600;font-size:11px;letter-spacing:.02em">🇷🇺 РОСКАДАСТР (РФ)</div>
-      ${rfCardHTML(p.cad, p)}</div>
-      ${uaCardForRf(p.cad)}
+  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45;display:flex;flex-direction:column;max-height:min(70vh,520px)">
+      <div style="flex:0 0 auto">${cardHeadHTML(p.ad || '', [c ? ruName(c.name) : '', uaCad ? raionOf(uaCad) : ''].filter(Boolean).join(' · '))}</div>
+      <div class="pop-scroll" style="overflow-y:auto;flex:1 1 auto;min-height:0;padding-right:3px">
+        <div style="margin-top:5px"><div style="color:#ff6b6b;font-weight:600;font-size:11px;letter-spacing:.02em">🇷🇺 РОСКАДАСТР (РФ)</div>
+        ${rfCardHTML(p.cad, p)}</div>
+        ${uaCardForRf(p.cad)}
+        ${bldBlockHTML(p.cad)}
+      </div>
     </div>`;
 }
 function toggleRfLayer(key, on) {
@@ -2331,7 +2370,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v32';
+const BUILD_VERSION = 'v33';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
