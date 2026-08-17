@@ -352,6 +352,7 @@
         <input type="checkbox" id="rf-builds" style="width:13px;height:13px;accent-color:#f0c04a;margin:0">
         <span style="width:11px;height:3px;background:#f0c04a;border-radius:2px;flex-shrink:0"></span>Здания <span style="color:var(--muted);font-size:10px">17 281</span>
       </label>
+      <button id="rf-goto" class="btn-reset" style="margin-top:6px;margin-bottom:0;border-color:#ff4d4d;color:#ff8a8a">📍 Показать Геническ</button>
     </div>
 
     <div class="filter-group">
@@ -958,6 +959,18 @@ function toggleRfLayer(key, on) {
   } else if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
 }
 loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
+// Кнопка «Показать Геническ»: включает оба слоя и летит к кварталу (данные пока только по нему)
+document.getElementById('rf-goto').addEventListener('click', () => {
+  // сначала переносим вид (setView, а не flyTo: отрисовка тысяч объектов прерывает анимацию),
+  // слои включаем следующим кадром — иначе перелёт не доезжает
+  map.setView([46.1745, 34.8065], 16);
+  setTimeout(() => {
+    for (const [id, key] of [['rf-parcels','parcels'], ['rf-builds','builds']]) {
+      const cb = document.getElementById(id);
+      if (!cb.checked) { cb.checked = true; toggleRfLayer(key, true); }
+    }
+  }, 60);
+});
 document.getElementById('rf-parcels').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
 document.getElementById('rf-builds').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
 
@@ -2298,7 +2311,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v30';
+const BUILD_VERSION = 'v31';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
