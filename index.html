@@ -369,6 +369,7 @@
         <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр — Геническ</div>
         <label class="lyr"><input type="checkbox" id="ly-rf"><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
         <label class="lyr"><input type="checkbox" id="ly-bld"><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
+        <div id="rf-zoom-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0"></div>
         <button id="rf-goto" type="button" class="lyr-btn">📍 Показать Геническ</button>
       </div>
     </div>
@@ -1077,25 +1078,47 @@ function rfPopup(p) {
       </div>
     </div>`;
 }
+// Слои Роскадастра тяжёлые (6.8k участков + 17k зданий). На отдалении они все попадают в кадр,
+// перерисовка canvas занимает ~3 с, и всё это время Leaflet показывает РАСТЯНУТУЮ копию —
+// пользователь видит размытое пятно во весь экран. Поэтому рисуем их только вблизи.
+const RF_MIN_ZOOM = { parcels: 14, builds: 15 };
+const rfWanted = { parcels: false, builds: false };
 function toggleRfLayer(key, on) {
-  const L_ = RF_LAYERS[key];
-  if (on) {
-    if (!L_.layer) {
-      const mk = key === 'builds' ? bldPopup : rfPopup;   // у зданий свой попап (дом + участок под ним)
-      L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
-      // подсветка при наведении (делегируем на слой, а не вешаем обработчики на тысячи объектов)
-      L_.layer.on('mouseover', e => {
-        e.layer.setStyle(L_.hover);
-        if (e.layer.bringToFront) e.layer.bringToFront();
-        map.getContainer().style.cursor = 'pointer';
-      });
-      L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
-      fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
-    }
-    if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
-    loadRfMatch();   // индекс связей нужен попапам обоих слоёв
-  } else if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
+  rfWanted[key] = on;
+  if (on) loadRfMatch();
+  applyRfZoomGate();
 }
+function applyRfZoomGate() {
+  const z = map.getZoom();
+  let hidden = 0;
+  for (const key of ['parcels', 'builds']) {
+    const L_ = RF_LAYERS[key];
+    const show = rfWanted[key] && z >= RF_MIN_ZOOM[key];
+    if (show) {
+      if (!L_.layer) {
+        const mk = key === 'builds' ? bldPopup : rfPopup;
+        L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
+        L_.layer.on('mouseover', e => {
+          e.layer.setStyle(L_.hover);
+          if (e.layer.bringToFront) e.layer.bringToFront();
+          map.getContainer().style.cursor = 'pointer';
+        });
+        L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
+        fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
+      }
+      if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
+    } else {
+      if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
+      if (rfWanted[key]) hidden = Math.max(hidden, RF_MIN_ZOOM[key]);
+    }
+  }
+  const hint = document.getElementById('rf-zoom-hint');
+  if (hint) {
+    hint.textContent = hidden ? `приблизьте до z${hidden}, чтобы увидеть` : '';
+    hint.style.display = hidden ? 'block' : 'none';
+  }
+}
+map.on('zoomend', applyRfZoomGate);
 loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
 // ── Панель слоёв: украинские и российские, любые комбинации ──
 // Украинские участки: слои советов рисуются лениво, поэтому храним флаг видимости и применяем ко всем.
@@ -2350,7 +2373,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v39';
+const BUILD_VERSION = 'v40';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
