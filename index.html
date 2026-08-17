@@ -241,6 +241,21 @@
   .fullmap-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15,17,23,0.92); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 12px; border-radius: 6px; pointer-events: none; display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
   .fullmap-hint.show { display: block; }
   /* Подписи городов/сёл в режиме «Полная карта» */
+  /* Панель слоёв: две группы (укр. / РФ), любые комбинации */
+  #layers-box .lyr-grp { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 7px 8px; margin-top: 5px; }
+  #layers-box .lyr-h { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+                       display: flex; align-items: center; gap: 5px; margin-bottom: 5px; font-weight: 600; }
+  #layers-box .lyr-h .flag { font-size: 12px; }
+  #layers-box .lyr { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text);
+                     cursor: pointer; user-select: none; padding: 2px 0; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  #layers-box .lyr:hover { color: #fff; }
+  #layers-box .lyr input { width: 13px; height: 13px; margin: 0; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+  #layers-box .lyr .sw { width: 12px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  #layers-box .lyr .cnt { margin-left: auto; color: var(--muted); font-size: 10px; font-family: 'IBM Plex Mono', monospace; }
+  #layers-box .lyr input:not(:checked) ~ .sw { opacity: .3; }
+  #layers-box .lyr-btn { width: 100%; margin-top: 6px; padding: 5px; background: transparent; border: 1px solid #ff4d4d;
+                         color: #ff8a8a; border-radius: 4px; font: inherit; font-size: 11px; cursor: pointer; }
+  #layers-box .lyr-btn:hover { background: rgba(255,77,77,.12); }
   /* Карточки объединённого попапа: единая сетка «подпись — значение» */
   .pc { margin-top: 6px; padding: 7px 9px; border-radius: 4px; border: 1px solid; }
   .pc-ua { background: rgba(232,197,71,.08); border-color: #e8c547; }
@@ -343,6 +358,21 @@
       <div id="search-results"></div>
     </div>
 
+    <div class="filter-group" id="layers-box">
+      <label>Слои</label>
+      <div class="lyr-grp">
+        <div class="lyr-h"><span class="flag">🇺🇦</span>Украинский кадастр</div>
+        <label class="lyr"><input type="checkbox" id="ly-ua" checked><span class="sw" style="background:#4caf7d"></span>Участки<span class="cnt" id="cnt-ua"></span></label>
+        <label class="lyr"><input type="checkbox" id="ly-mz"><span class="sw" style="background:#c050ff"></span>Размежёванные<span class="cnt">2 408</span></label>
+      </div>
+      <div class="lyr-grp">
+        <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр — Геническ</div>
+        <label class="lyr"><input type="checkbox" id="ly-rf"><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
+        <label class="lyr"><input type="checkbox" id="ly-bld"><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
+        <button id="rf-goto" type="button" class="lyr-btn">📍 Показать Геническ</button>
+      </div>
+    </div>
+
     <div class="filter-group">
       <label>Форма собственности</label>
       <div id="own-mode">
@@ -359,19 +389,6 @@
         <option value="yes">Размежеванные</option>
         <option value="no">Не размежеванные</option>
       </select>
-    </div>
-
-    <div class="filter-group" id="rf-layers">
-      <label>Роскадастр — Геническ (КПТ 94:21:1010004)</label>
-      <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-top:3px">
-        <input type="checkbox" id="rf-parcels" style="width:13px;height:13px;accent-color:#ff5d5d;margin:0">
-        <span style="width:11px;height:3px;background:#ff5d5d;border-radius:2px;flex-shrink:0"></span>Участки РФ <span style="color:var(--muted);font-size:10px">6 793</span>
-      </label>
-      <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-top:3px">
-        <input type="checkbox" id="rf-builds" style="width:13px;height:13px;accent-color:#f0c04a;margin:0">
-        <span style="width:11px;height:3px;background:#f0c04a;border-radius:2px;flex-shrink:0"></span>Здания <span style="color:var(--muted);font-size:10px">17 281</span>
-      </label>
-      <button id="rf-goto" class="btn-reset" style="margin-top:6px;margin-bottom:0;border-color:#ff4d4d;color:#ff8a8a">📍 Показать Геническ</button>
     </div>
 
     <div class="filter-group">
@@ -675,6 +692,7 @@ async function loadCouncilPolygons(code, additive = false) {
     });
     polygonLayers[code] = layer;
     additive ? addPolygonsAdditive(code) : showOnlyPolygons(code);
+    if (typeof updUaCount === 'function') updUaCount();
     return layer;
   } catch (e) {
     console.warn(`No polygons for ${code}:`, e);
@@ -1003,7 +1021,7 @@ function syncParcelTiles() {
 let razmezhLayer = null;
 function syncRazmezh() {
   // видно: всегда при фильтре «Размежёванные»; и по умолчанию в режиме «Вся карта» (кроме явного «Не размежёванные»)
-  if (filterMz === 'yes' || (ownMode === 'all' && filterMz !== 'no')) {
+  if (mzLayerOn || filterMz === 'yes' || (ownMode === 'all' && filterMz !== 'no')) {
     if (!razmezhLayer) {
       razmezhLayer = L.geoJSON(null, { interactive: false, style: { color: '#c050ff', weight: 1.6, fillColor: '#c050ff', fillOpacity: 0.25 } });
       fetch('razmezh.geojson').then(r => r.json()).then(d => razmezhLayer.addData(d)).catch(() => {});
@@ -1072,143 +1090,41 @@ function toggleRfLayer(key, on) {
   } else if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
 }
 loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
-// Кнопка «Показать Геническ»: включает оба слоя и летит к кварталу (данные пока только по нему)
-document.getElementById('rf-goto').addEventListener('click', async () => {
-  // сначала переносим вид (setView, а не flyTo: отрисовка тысяч объектов прерывает анимацию)
+// ── Панель слоёв: украинские и российские, любые комбинации ──
+// Украинские участки: слои советов рисуются лениво, поэтому храним флаг видимости и применяем ко всем.
+function updUaCount() {
+  const n = Object.keys(polygonLayers).reduce((a, k) => a + (map.hasLayer(polygonLayers[k]) ? polygonLayers[k].getLayers().length : 0), 0);
+  const el = document.getElementById('cnt-ua');
+  if (el) el.textContent = n ? n.toLocaleString('ru') : '—';
+}
+function applyUaLayer(on) {
+  polygonsVisible = on;
+  for (const code in polygonLayers) {
+    const l = polygonLayers[code];
+    if (on) { if (!map.hasLayer(l)) l.addTo(map); }
+    else if (map.hasLayer(l)) map.removeLayer(l);
+  }
+  updUaCount();
+}
+// Слой «Размежёванные» (razmezh.geojson) — независимая галочка, без привязки к фильтру
+let mzLayerOn = false;
+function applyMzLayer(on) { mzLayerOn = on; syncRazmezh(); }
+document.getElementById('ly-ua').addEventListener('change', e => applyUaLayer(e.target.checked));
+document.getElementById('ly-mz').addEventListener('change', e => applyMzLayer(e.target.checked));
+document.getElementById('ly-rf').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
+document.getElementById('ly-bld').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
+// Кнопка «Показать Геническ»: включает всё нужное и переносит вид на квартал
+document.getElementById('rf-goto').addEventListener('click', () => {
   map.setView([46.1745, 34.8065], 16);
-  // ВАЖНО: в режиме «По сёлам» украинские участки рисуются только для ОТКРЫТОГО села —
-  // без этого на экране были бы одни РФ-слои и казалось бы, что укр. данные пропали
-  loadCouncilPolygons('6522110100');
+  const ua = document.getElementById('ly-ua');
+  if (!ua.checked) { ua.checked = true; applyUaLayer(true); }
+  loadCouncilPolygons('6522110100');   // укр. участки рисуются только для ОТКРЫТОГО села
   setTimeout(() => {
-    for (const [id, key] of [['rf-parcels','parcels'], ['rf-builds','builds']]) {
+    for (const [id, key] of [['ly-rf','parcels'], ['ly-bld','builds']]) {
       const cb = document.getElementById(id);
       if (!cb.checked) { cb.checked = true; toggleRfLayer(key, true); }
     }
   }, 60);
-});
-document.getElementById('rf-parcels').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
-document.getElementById('rf-builds').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
-
-// ===== Подписи НП «как на бете»: тот же источник (councils-index.json), те же центры/координаты/имена и правила кликов =====
-const isUrban = n => /^(смт|пгт|м\.|город)(\s|$)/i.test(n || '');   // урбан-НП (для выбора центра района)
-const BIG_TOWNS = new Set(['6510700000', '6510400000']);   // крупные города на обзоре (Новая Каховка, Каховка)
-const LABEL_HIDE = new Set(['6523855000']);   // дубль «Нижні Сірогози — поля» рядом с самим смт
-// Сокращение подписей на карте: квалификатор (Верхний/Нижний/Великая/Большая/Малая/Новая/Старая/Голая/Средний) → первая буква.
-// Только точные слова из списка — чтобы НЕ сломать имена вроде «Давыдов Брод», «Максима Горького», «Новодмитровка».
-const LABEL_QUALIFIERS = new Set([
-  'Верхний','Верхняя','Верхнее','Верхние','Нижний','Нижняя','Нижнее','Нижние',
-  'Великий','Великая','Великое','Великие','Большой','Большая','Большое','Большие',
-  'Малый','Малая','Малое','Малые','Новый','Новая','Новое','Новые',
-  'Старый','Старая','Старое','Старые','Голый','Голая','Голое','Голые',
-  'Средний','Средняя','Среднее','Средние',
-]);
-function abbrLabel(name) {
-  const m = name.match(/^((?:с|х|г|м)\.\s+)?(.+)$/);   // отделяем тип-префикс (с./х./г./м.)
-  const pre = m[1] || '', rest = m[2], sp = rest.indexOf(' ');
-  if (sp > 0 && LABEL_QUALIFIERS.has(rest.slice(0, sp))) return pre + rest[0] + '. ' + rest.slice(sp + 1);
-  return name;
-}
-let CIDX = [];            // councils-index.json: {c,n,lat,lon,total,ha,o:{p,k,g,n},bb} — тот же набор, что у беты
-let BB_BY_CODE = {};      // code → [W,S,E,N] bbox участков совета (обрезанный) — кандидаты для клика/наведения, учитывает раскиданные участки
-let LABEL_PTS = [];       // вычисленные точки подписей (как feats в бете)
-let OBLAST_BOUNDS = null; // bbox всех точек — для динамического порога появления сёл
-const isCenter = p => p.ctr || p.big || p.capital;
-function councilToCidx(c) {   // фоллбэк из встроенных COUNCILS, если индекс не загрузится
-  const o = {}, bo = c.by_ownership || {};
-  for (const key in bo) { const s = OT_SHORT[key]; if (s) o[s] = bo[key]; }
-  return { c: c.code, n: c.name, lat: c.lat, lon: c.lon, total: c.total || 0, ha: c.area, o };
-}
-function buildLabelPts() {
-  const pts = CIDX.filter(c => c.lat && c.lon);
-  // районный центр = главное (макс. участков) урбан-НП района; если урбан нет — макс. участков
-  const centers = new Set(), byR = {};
-  for (const c of pts) { const r = raionOf(c.c); if (r) (byR[r] = byR[r] || []).push(c); }
-  for (const r in byR) {
-    if (r === 'город Херсон') continue;   // Херсон добавляем вручную (единого совета нет)
-    const g = byR[r], urb = g.filter(c => isUrban(c.n)), pool = urb.length ? urb : g;
-    const best = pool.reduce((a, b) => (+b.total || 0) > (+a.total || 0) ? b : a);
-    if (best) centers.add(best.c);
-  }
-  LABEL_PTS = pts.filter(c => !LABEL_HIDE.has(c.c)).map(c => ({
-    c: c.c, n: c.n, lat: c.lat, lon: c.lon, total: c.total || 0, o: c.o, ha: c.ha,
-    name: abbrLabel(ruName(c.n).replace(/^пгт\s+/i, '')),
-    ctr: centers.has(c.c), big: BIG_TOWNS.has(c.c), rpfx: c.c.slice(2, 5),
-  }));
-  // Херсон (~280k) нет в данных как единый НП — добавляем вручную как центр (виден на обзоре)
-  LABEL_PTS.push({ c: '__kherson', n: 'Херсон', lat: 46.7000, lon: 32.6169, total: 999999, o: null, ha: null, name: '★Херсон', ctr: true, big: true, capital: true, rpfx: '201' });   // подпись со звездой, у северного края города
-  OBLAST_BOUNDS = L.latLngBounds(LABEL_PTS.map(p => [p.lat, p.lon]));
-}
-fetch('councils-index.json').then(r => r.json())
-  .then(d => { CIDX = d; })
-  .catch(() => { CIDX = COUNCILS.map(councilToCidx); })   // офлайн-фоллбэк: те же советы из встроенных данных
-  .then(() => { for (const c of CIDX) if (c.bb) BB_BY_CODE[c.c] = c.bb; buildLabelPts(); if (labelsActive()) labelsUpdate(); });
-
-// ── Навигация по клику в «Вся карта» (всё строго по центру НП) ──
-const NP_ZOOM_1 = 11.5, NP_ZOOM_2 = 13.0, NP_ZOOM_3 = 14.0, NP_ZOOM_4 = 14.5;   // 1-й/2-й/3-й/4-й клик, на экране ~1440px
-function npZoom(base) { return base + Math.log2((window.innerWidth || 1440) / 1440); }   // подстройка под размер монитора
-let clickStep = 0, clickRaion = '';
-function clickNP(p) {   // прогрессия по кликам: райцентр → 11.5, 2-й → 13.0, 3-й → 14.0, 4-й+ → 14.5; всё по центру, плавно, привязано к экрану
-  const raion = RAION_BY_PREFIX[p.rpfx] || p.c;
-  if (isCenter(p) && (clickStep === 0 || raion !== clickRaion)) { clickStep = 1; clickRaion = raion; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_1), { duration: 1.4 }); }
-  else if (clickStep <= 1) { clickStep = 2; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_2), { duration: 1.1 }); }
-  else if (clickStep === 2) { clickStep = 3; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_3), { duration: 1.0 }); }
-  else { clickStep = 4; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_4), { duration: 0.9 }); }
-}
-
-// ── Наведение → табличка форм собственности: для центра по ВСЕМУ району, для села по совету ──
-let hoverPop = null;
-function clearHover() { if (hoverPop) { map.closePopup(hoverPop); hoverPop = null; } }
-function showTable(latlng, html) {
-  clearHover();
-  hoverPop = L.popup({ closeButton: false, autoClose: false, closeOnClick: false, autoPan: false, className: 'rt-hover-pop', offset: [0, -4] }).setLatLng(latlng).setContent(html).openOn(map);
-}
-function ownNums(o) { return ['p', 'k', 'g', 'n'].map(k => `<div style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:${TILE_OWN_COLOR[k]};flex-shrink:0"></span><b style="font-family:'IBM Plex Mono',monospace;color:#1a1a1a;font-weight:600">${(o[k] || 0).toLocaleString('ru')}</b></div>`).join(''); }
-function ownTableHTML(p) {
-  const rai = RAION_BY_PREFIX[p.rpfx] || '';
-  return `<div style="font-size:11px;line-height:1.5;min-width:180px"><div style="color:#1a1a1a;font-weight:700">${escapeHtml(ruName(p.n))}</div>${rai ? `<div style="color:#666;font-size:10px">${escapeHtml(rai)}</div>` : ''}<div style="color:#333;font-family:'IBM Plex Mono',monospace;margin:3px 0 5px">${(p.total || 0).toLocaleString('ru')} уч.${p.ha != null ? ' · ' + Math.round(p.ha).toLocaleString('ru') + ' га' : ''}</div><div style="display:flex;flex-wrap:wrap;gap:5px 13px">${ownNums(p.o || {})}</div></div>`;
-}
-function raionTableHTML(rname) {
-  const rc = CIDX.filter(c => raionOf(c.c) === rname), o = { p: 0, k: 0, g: 0, n: 0 }; let tot = 0, ha = 0;
-  for (const c of rc) { const co = c.o || {}; for (const k in o) o[k] += co[k] || 0; tot += c.total || 0; ha += c.ha || 0; }
-  return `<div style="font-size:11px;line-height:1.5;min-width:180px"><div style="color:#1a1a1a;font-weight:700">${escapeHtml(rname)}</div><div style="color:#666;font-size:10px">${rc.length} НП · весь район</div><div style="color:#333;font-family:'IBM Plex Mono',monospace;margin:3px 0 5px">${tot.toLocaleString('ru')} уч. · ${Math.round(ha).toLocaleString('ru')} га</div><div style="display:flex;flex-wrap:wrap;gap:5px 13px">${ownNums(o)}</div></div>`;
-}
-function showOwnTable(p) { if (p.o) showTable([p.lat, p.lon], ownTableHTML(p)); }
-function showRaionTable(p) { const rname = RAION_BY_PREFIX[p.rpfx]; if (rname) showTable([p.lat, p.lon], raionTableHTML(rname)); }
-
-// Наведение в ОБЛАСТЬ НП на ЛЮБОМ зуме: по карте ищем ближайший НП и показываем его табличку у курсора (не только на подписи)
-let lastHoverCode = '';
-function mapAreaHover(latlng, ev) {
-  // ближайший НП СРЕДИ ВИДИМЫХ подписей (labelByCode)
-  let best = null, bd = 1e9;
-  for (const p of LABEL_PTS) {
-    if (!labelByCode[p.c] || !p.o) continue;
-    const d = (p.lat - latlng.lat) ** 2 + (p.lon - latlng.lng) ** 2;
-    if (d < bd) { bd = d; best = p; }
-  }
-  // попап ТОЛЬКО если курсор над самой подписью + ~2мм по кругу (а не в широком радиусе)
-  const el = best && labelByCode[best.c] && labelByCode[best.c].getElement();
-  if (!el || !ev) { clearHover(); lastHoverCode = ''; return; }
-  const r = el.getBoundingClientRect(), M = 8;   // ~2мм запас вокруг подписи
-  if (ev.clientX < r.left - M || ev.clientX > r.right + M || ev.clientY < r.top - M || ev.clientY > r.bottom + M) {
-    clearHover(); lastHoverCode = ''; return;     // дальше 2мм от подписи — без попапа
-  }
-  if (hoverPop && best.c === lastHoverCode) {     // переиспользуем: двигаем за курсором, без дёрганья
-    hoverPop.setLatLng(latlng);
-  } else {
-    showTable(latlng, ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.rpfx }));
-  }
-  lastHoverCode = best.c;
-}
-let _mahQ = false, _mahArgs = null;
-map.on('mousemove', e => {
-  if (!labelsActive() || !CIDX.length) return;                 // только в «Вся карта»
-  if (e.originalEvent && e.originalEvent.shiftKey) return;      // не мешать Shift-рамке подборки
-  const t = e.originalEvent && e.originalEvent.target;
-  if (t && t.closest && t.closest('.leaflet-tooltip.council-label')) return;   // над подписью — её собственный hover (центр→район, село→совет)
-  _mahArgs = [e.latlng, e.originalEvent];
-  if (_mahQ) return;                                           // не чаще кадра (скан LABEL_PTS не на каждый пиксель)
-  _mahQ = true;
-  requestAnimationFrame(() => { _mahQ = false; if (_mahArgs) mapAreaHover(_mahArgs[0], _mahArgs[1]); });
 });
 // mouseleave контейнера (НЕ map 'mouseout', который срабатывает при заходе на подпись и гасил табличку)
 map.getContainer().addEventListener('mouseleave', () => { clearHover(); lastHoverCode = ''; });
@@ -2426,7 +2342,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v37';
+const BUILD_VERSION = 'v38';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
