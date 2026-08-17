@@ -1106,6 +1106,10 @@ function rfRender(key) {                   // перерисовать слой 
   if (L_.shown === vis.length && L_.key === `${W.toFixed(4)},${S.toFixed(4)},${E.toFixed(4)}`) return;
   L_.shown = vis.length; L_.key = `${W.toFixed(4)},${S.toFixed(4)},${E.toFixed(4)}`;
   L_.layer.clearLayers();
+  if (L_.renderer && L_.renderer._ctx && L_.renderer._container) {   // полностью гасим холст слоя, без остаточных пикселей
+    const c = L_.renderer._container, x = L_.renderer._ctx;
+    x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height); x.restore();
+  }
   L_.layer.addData({ type: 'FeatureCollection', features: vis });
 }
 function toggleRfLayer(key, on) {
@@ -1122,7 +1126,10 @@ function applyRfZoomGate() {
     if (show) {
       if (!L_.layer) {
         const mk = key === 'builds' ? bldPopup : rfPopup;
-        L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
+        // СВОЙ canvas на слой: при пересборке Leaflet чистит только изменившуюся область общего
+        // холста, и от снятых объектов оставались пиксели — они и выглядели как свечение/пятно.
+        L_.renderer = L.canvas({ padding: 0.2 });
+        L_.layer = L.geoJSON(null, { renderer: L_.renderer, style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
         L_.layer.on('mouseover', e => {
           e.layer.setStyle(L_.hover);
           if (e.layer.bringToFront) e.layer.bringToFront();
@@ -1147,8 +1154,16 @@ function applyRfZoomGate() {
     hint.style.display = hidden ? 'block' : 'none';
   }
 }
-map.on('zoomend', applyRfZoomGate);
-map.on('moveend', () => { for (const k of ['parcels', 'builds']) rfRender(k); });
+// ВАЖНО: пересборку слоёв нельзя делать прямо в обработчике zoomend/moveend —
+// добавление тысяч объектов синхронно срывает зум-анимацию Leaflet: карта «залипает»
+// на прежнем зуме, а на экране остаётся РАСТЯНУТЫЙ кадр (размытое пятно/свечение).
+// Поэтому откладываем работу до конца кадра.
+let rfTimer = null;
+function rfSchedule() {
+  clearTimeout(rfTimer);
+  rfTimer = setTimeout(() => { rfTimer = null; applyRfZoomGate(); }, 180);
+}
+map.on('zoomend moveend', rfSchedule);
 loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
 // ── Панель слоёв: украинские и российские, любые комбинации ──
 // Украинские участки: слои советов рисуются лениво, поэтому храним флаг видимости и применяем ко всем.
@@ -2403,7 +2418,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v41';
+const BUILD_VERSION = 'v42';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
