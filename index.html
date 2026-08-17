@@ -1232,6 +1232,133 @@ document.getElementById('rf-goto').addEventListener('click', () => {
     }
   }, 60);
 });
+// ⚠️ ВОССТАНОВЛЕНО 18.08.2026: этот блок был случайно вырезан в v38 («панель слоёв») вместе с
+// объявлениями BB_BY_CODE / LABEL_PTS / OBLAST_BOUNDS / isCenter / clickNP / clearHover /
+// showOwnTable / showRaionTable — при том, что вызовы остались. nearCouncils() падал на
+// ReferenceError, из-за чего в «Вся карта» не работали наведение, клик и рамка по участкам,
+// а подписи НП не появлялись вовсе. Удалять по частям нельзя — сначала убрать все вызовы.
+// ===== Подписи НП «как на бете»: тот же источник (councils-index.json), те же центры/координаты/имена и правила кликов =====
+const isUrban = n => /^(смт|пгт|м\.|город)(\s|$)/i.test(n || '');   // урбан-НП (для выбора центра района)
+const BIG_TOWNS = new Set(['6510700000', '6510400000']);   // крупные города на обзоре (Новая Каховка, Каховка)
+const LABEL_HIDE = new Set(['6523855000']);   // дубль «Нижні Сірогози — поля» рядом с самим смт
+// Сокращение подписей на карте: квалификатор (Верхний/Нижний/Великая/Большая/Малая/Новая/Старая/Голая/Средний) → первая буква.
+// Только точные слова из списка — чтобы НЕ сломать имена вроде «Давыдов Брод», «Максима Горького», «Новодмитровка».
+const LABEL_QUALIFIERS = new Set([
+  'Верхний','Верхняя','Верхнее','Верхние','Нижний','Нижняя','Нижнее','Нижние',
+  'Великий','Великая','Великое','Великие','Большой','Большая','Большое','Большие',
+  'Малый','Малая','Малое','Малые','Новый','Новая','Новое','Новые',
+  'Старый','Старая','Старое','Старые','Голый','Голая','Голое','Голые',
+  'Средний','Средняя','Среднее','Средние',
+]);
+function abbrLabel(name) {
+  const m = name.match(/^((?:с|х|г|м)\.\s+)?(.+)$/);   // отделяем тип-префикс (с./х./г./м.)
+  const pre = m[1] || '', rest = m[2], sp = rest.indexOf(' ');
+  if (sp > 0 && LABEL_QUALIFIERS.has(rest.slice(0, sp))) return pre + rest[0] + '. ' + rest.slice(sp + 1);
+  return name;
+}
+let CIDX = [];            // councils-index.json: {c,n,lat,lon,total,ha,o:{p,k,g,n},bb} — тот же набор, что у беты
+let BB_BY_CODE = {};      // code → [W,S,E,N] bbox участков совета (обрезанный) — кандидаты для клика/наведения, учитывает раскиданные участки
+let LABEL_PTS = [];       // вычисленные точки подписей (как feats в бете)
+let OBLAST_BOUNDS = null; // bbox всех точек — для динамического порога появления сёл
+const isCenter = p => p.ctr || p.big || p.capital;
+function councilToCidx(c) {   // фоллбэк из встроенных COUNCILS, если индекс не загрузится
+  const o = {}, bo = c.by_ownership || {};
+  for (const key in bo) { const s = OT_SHORT[key]; if (s) o[s] = bo[key]; }
+  return { c: c.code, n: c.name, lat: c.lat, lon: c.lon, total: c.total || 0, ha: c.area, o };
+}
+function buildLabelPts() {
+  const pts = CIDX.filter(c => c.lat && c.lon);
+  // районный центр = главное (макс. участков) урбан-НП района; если урбан нет — макс. участков
+  const centers = new Set(), byR = {};
+  for (const c of pts) { const r = raionOf(c.c); if (r) (byR[r] = byR[r] || []).push(c); }
+  for (const r in byR) {
+    if (r === 'город Херсон') continue;   // Херсон добавляем вручную (единого совета нет)
+    const g = byR[r], urb = g.filter(c => isUrban(c.n)), pool = urb.length ? urb : g;
+    const best = pool.reduce((a, b) => (+b.total || 0) > (+a.total || 0) ? b : a);
+    if (best) centers.add(best.c);
+  }
+  LABEL_PTS = pts.filter(c => !LABEL_HIDE.has(c.c)).map(c => ({
+    c: c.c, n: c.n, lat: c.lat, lon: c.lon, total: c.total || 0, o: c.o, ha: c.ha,
+    name: abbrLabel(ruName(c.n).replace(/^пгт\s+/i, '')),
+    ctr: centers.has(c.c), big: BIG_TOWNS.has(c.c), rpfx: c.c.slice(2, 5),
+  }));
+  // Херсон (~280k) нет в данных как единый НП — добавляем вручную как центр (виден на обзоре)
+  LABEL_PTS.push({ c: '__kherson', n: 'Херсон', lat: 46.7000, lon: 32.6169, total: 999999, o: null, ha: null, name: '★Херсон', ctr: true, big: true, capital: true, rpfx: '201' });   // подпись со звездой, у северного края города
+  OBLAST_BOUNDS = L.latLngBounds(LABEL_PTS.map(p => [p.lat, p.lon]));
+}
+fetch('councils-index.json').then(r => r.json())
+  .then(d => { CIDX = d; })
+  .catch(() => { CIDX = COUNCILS.map(councilToCidx); })   // офлайн-фоллбэк: те же советы из встроенных данных
+  .then(() => { for (const c of CIDX) if (c.bb) BB_BY_CODE[c.c] = c.bb; buildLabelPts(); if (labelsActive()) labelsUpdate(); });
+
+// ── Навигация по клику в «Вся карта» (всё строго по центру НП) ──
+const NP_ZOOM_1 = 11.5, NP_ZOOM_2 = 13.0, NP_ZOOM_3 = 14.0, NP_ZOOM_4 = 14.5;   // 1-й/2-й/3-й/4-й клик, на экране ~1440px
+function npZoom(base) { return base + Math.log2((window.innerWidth || 1440) / 1440); }   // подстройка под размер монитора
+let clickStep = 0, clickRaion = '';
+function clickNP(p) {   // прогрессия по кликам: райцентр → 11.5, 2-й → 13.0, 3-й → 14.0, 4-й+ → 14.5; всё по центру, плавно, привязано к экрану
+  const raion = RAION_BY_PREFIX[p.rpfx] || p.c;
+  if (isCenter(p) && (clickStep === 0 || raion !== clickRaion)) { clickStep = 1; clickRaion = raion; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_1), { duration: 1.4 }); }
+  else if (clickStep <= 1) { clickStep = 2; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_2), { duration: 1.1 }); }
+  else if (clickStep === 2) { clickStep = 3; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_3), { duration: 1.0 }); }
+  else { clickStep = 4; map.flyTo([p.lat, p.lon], npZoom(NP_ZOOM_4), { duration: 0.9 }); }
+}
+
+// ── Наведение → табличка форм собственности: для центра по ВСЕМУ району, для села по совету ──
+let hoverPop = null;
+function clearHover() { if (hoverPop) { map.closePopup(hoverPop); hoverPop = null; } }
+function showTable(latlng, html) {
+  clearHover();
+  hoverPop = L.popup({ closeButton: false, autoClose: false, closeOnClick: false, autoPan: false, className: 'rt-hover-pop', offset: [0, -4] }).setLatLng(latlng).setContent(html).openOn(map);
+}
+function ownNums(o) { return ['p', 'k', 'g', 'n'].map(k => `<div style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:${TILE_OWN_COLOR[k]};flex-shrink:0"></span><b style="font-family:'IBM Plex Mono',monospace;color:#1a1a1a;font-weight:600">${(o[k] || 0).toLocaleString('ru')}</b></div>`).join(''); }
+function ownTableHTML(p) {
+  const rai = RAION_BY_PREFIX[p.rpfx] || '';
+  return `<div style="font-size:11px;line-height:1.5;min-width:180px"><div style="color:#1a1a1a;font-weight:700">${escapeHtml(ruName(p.n))}</div>${rai ? `<div style="color:#666;font-size:10px">${escapeHtml(rai)}</div>` : ''}<div style="color:#333;font-family:'IBM Plex Mono',monospace;margin:3px 0 5px">${(p.total || 0).toLocaleString('ru')} уч.${p.ha != null ? ' · ' + Math.round(p.ha).toLocaleString('ru') + ' га' : ''}</div><div style="display:flex;flex-wrap:wrap;gap:5px 13px">${ownNums(p.o || {})}</div></div>`;
+}
+function raionTableHTML(rname) {
+  const rc = CIDX.filter(c => raionOf(c.c) === rname), o = { p: 0, k: 0, g: 0, n: 0 }; let tot = 0, ha = 0;
+  for (const c of rc) { const co = c.o || {}; for (const k in o) o[k] += co[k] || 0; tot += c.total || 0; ha += c.ha || 0; }
+  return `<div style="font-size:11px;line-height:1.5;min-width:180px"><div style="color:#1a1a1a;font-weight:700">${escapeHtml(rname)}</div><div style="color:#666;font-size:10px">${rc.length} НП · весь район</div><div style="color:#333;font-family:'IBM Plex Mono',monospace;margin:3px 0 5px">${tot.toLocaleString('ru')} уч. · ${Math.round(ha).toLocaleString('ru')} га</div><div style="display:flex;flex-wrap:wrap;gap:5px 13px">${ownNums(o)}</div></div>`;
+}
+function showOwnTable(p) { if (p.o) showTable([p.lat, p.lon], ownTableHTML(p)); }
+function showRaionTable(p) { const rname = RAION_BY_PREFIX[p.rpfx]; if (rname) showTable([p.lat, p.lon], raionTableHTML(rname)); }
+
+// Наведение в ОБЛАСТЬ НП на ЛЮБОМ зуме: по карте ищем ближайший НП и показываем его табличку у курсора (не только на подписи)
+let lastHoverCode = '';
+function mapAreaHover(latlng, ev) {
+  // ближайший НП СРЕДИ ВИДИМЫХ подписей (labelByCode)
+  let best = null, bd = 1e9;
+  for (const p of LABEL_PTS) {
+    if (!labelByCode[p.c] || !p.o) continue;
+    const d = (p.lat - latlng.lat) ** 2 + (p.lon - latlng.lng) ** 2;
+    if (d < bd) { bd = d; best = p; }
+  }
+  // попап ТОЛЬКО если курсор над самой подписью + ~2мм по кругу (а не в широком радиусе)
+  const el = best && labelByCode[best.c] && labelByCode[best.c].getElement();
+  if (!el || !ev) { clearHover(); lastHoverCode = ''; return; }
+  const r = el.getBoundingClientRect(), M = 8;   // ~2мм запас вокруг подписи
+  if (ev.clientX < r.left - M || ev.clientX > r.right + M || ev.clientY < r.top - M || ev.clientY > r.bottom + M) {
+    clearHover(); lastHoverCode = ''; return;     // дальше 2мм от подписи — без попапа
+  }
+  if (hoverPop && best.c === lastHoverCode) {     // переиспользуем: двигаем за курсором, без дёрганья
+    hoverPop.setLatLng(latlng);
+  } else {
+    showTable(latlng, ownTableHTML({ n: best.n, total: best.total, ha: best.ha, o: best.o, rpfx: best.rpfx }));
+  }
+  lastHoverCode = best.c;
+}
+let _mahQ = false, _mahArgs = null;
+map.on('mousemove', e => {
+  if (!labelsActive() || !CIDX.length) return;                 // только в «Вся карта»
+  if (e.originalEvent && e.originalEvent.shiftKey) return;      // не мешать Shift-рамке подборки
+  const t = e.originalEvent && e.originalEvent.target;
+  if (t && t.closest && t.closest('.leaflet-tooltip.council-label')) return;   // над подписью — её собственный hover (центр→район, село→совет)
+  _mahArgs = [e.latlng, e.originalEvent];
+  if (_mahQ) return;                                           // не чаще кадра (скан LABEL_PTS не на каждый пиксель)
+  _mahQ = true;
+  requestAnimationFrame(() => { _mahQ = false; if (_mahArgs) mapAreaHover(_mahArgs[0], _mahArgs[1]); });
+});
+
 // mouseleave контейнера (НЕ map 'mouseout', который срабатывает при заходе на подпись и гасил табличку)
 map.getContainer().addEventListener('mouseleave', () => { clearHover(); lastHoverCode = ''; });
 
@@ -2449,7 +2576,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v46';
+const BUILD_VERSION = 'v47';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
