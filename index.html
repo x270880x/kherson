@@ -734,6 +734,38 @@ function copyCad(btn, text) {
 }
 const copyBtn = (text, title) => `<button onclick="copyCad(this,'${text}')" title="${title}" aria-label="${title}" style="display:inline-flex;align-items:center;background:none;border:1px solid rgba(255,255,255,0.25);border-radius:3px;color:#bbb;cursor:pointer;padding:2px 5px;line-height:1;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>`;
 
+// ── Связи «наш участок ↔ участки Роскадастра» (rf/genichesk_match.json, считается офлайн) ──
+// ua2rf: наш кадастр → [РФ-кадастры внутри него]; rf2ua: РФ-кадастр → наш; rf: атрибуты РФ-участков.
+let RFM = null, _rfmLoading = null;
+function loadRfMatch() {
+  if (RFM) return Promise.resolve(RFM);
+  if (!_rfmLoading) _rfmLoading = fetch('rf/genichesk_match.json').then(r => r.json())
+    .then(d => { RFM = d; return d; }).catch(() => { RFM = { ua2rf:{}, rf2ua:{}, rf:{} }; return RFM; });
+  return _rfmLoading;
+}
+// Карточка одного РФ-участка (в рамке) — используется и в нашем попапе, и в попапе РФ-слоя
+function rfCardHTML(rfCad, attrs, dim) {
+  const a = attrs || (RFM && RFM.rf[rfCad]) || {};
+  const line = (k, v) => v ? `<div style="margin-top:1px"><b style="color:#aaa">${k}:</b> ${escapeHtml(String(v))}</div>` : '';
+  return `<div style="margin-top:5px;padding:5px 8px;background:rgba(255,77,77,${dim?0.07:0.12});border:1px solid #ff4d4d;border-radius:3px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff8a8a;font-weight:600">${escapeHtml(rfCad)}</span>
+        ${copyBtn(rfCad, 'Скопировать кадастр РФ')}
+      </div>
+      ${a.a != null ? `<div style="color:#ddd;font-size:11px">${a.a} га</div>` : ''}
+      ${line('назнач.', a.use)}${line('категория', a.cat)}${line('адрес', a.ad)}
+    </div>`;
+}
+// Блок «Роскадастр» для нашего участка: один в один либо «поделён на N»
+function rfBlockForUa(cad) {
+  if (!RFM) return '';
+  const kids = RFM.ua2rf[cad];
+  if (!kids || !kids.length) return '';
+  const head = kids.length === 1
+    ? `<div style="color:#ff4d4d;font-weight:600;font-size:11px">🇷🇺 Роскадастр</div>`
+    : `<div style="color:#ff4d4d;font-weight:600;font-size:11px">🇷🇺 Роскадастр — участок поделён на ${kids.length}</div>`;
+  return `<div style="margin-top:7px;border-top:1px solid #333;padding-top:6px">${head}${kids.map(k => rfCardHTML(k)).join('')}</div>`;
+}
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
   const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#ff6f61':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
@@ -751,6 +783,7 @@ function buildParcelPopup(cad, data, council) {
       ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
       ${data.ot ? `<div style="color:${ownColor(data.ot)};font-size:10px;margin-top:4px">${escapeHtml(ruOwn(data.ot))}</div>` : ''}
       ${data.mz ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(192,80,255,0.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff">${data.mz}</span>${copyBtn(data.mz, 'Скопировать кадастр РФ')}</div><div style="color:#aaa;font-size:10px;margin-top:2px">${data.mzmo}${data.mzp?` · передача: ${data.mzp}`:''}</div></div>` : ''}
+      ${rfBlockForUa(cad)}
       ${basketBtn}
     </div>`;
 }
@@ -874,13 +907,44 @@ const RF_LAYERS = {
   builds:  { file: 'rf/genichesk_buildings.geojson', layer: null,
              style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 } },
 };
+// Украинская «родительская» карточка для РФ-участка (в рамке) + пометка, если надел был поделён
+function uaCardForRf(rfCad) {
+  if (!RFM) return '';
+  const uaCad = RFM.rf2ua[rfCad];
+  if (!uaCad) return `<div style="margin-top:7px;border-top:1px solid #333;padding-top:6px;color:#8b91a8;font-size:11px">В украинском кадастре этого участка нет</div>`;
+  const sib = RFM.ua2rf[uaCad] || [];
+  const c = COUNCILS.find(x => x.code === uaCad.slice(0, 10));
+  const d = c && c.parcels ? c.parcels.find(p => p.c === uaCad) : null;
+  const line = (k, v) => v ? `<div style="margin-top:1px"><b style="color:#aaa">${k}:</b> ${escapeHtml(String(v))}</div>` : '';
+  return `<div style="margin-top:7px;border-top:1px solid #333;padding-top:6px">
+      <div style="color:#e8c547;font-weight:600;font-size:11px">🇺🇦 Украинский кадастр${sib.length >= 2 ? ` — надел поделён на ${sib.length}` : ''}</div>
+      <div style="margin-top:5px;padding:5px 8px;background:rgba(232,197,71,0.10);border:1px solid #e8c547;border-radius:3px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e8c547;font-weight:600">${escapeHtml(uaCad)}</span>
+          ${copyBtn(uaCad, 'Скопировать кадастр (УКР)')}
+        </div>
+        ${d ? `${d.a != null ? `<div style="color:#ddd;font-size:11px">${d.a} га${c ? ' · ' + escapeHtml(ruName(c.name)) : ''}</div>` : ''}
+        ${line('назнач.', d.ct ? catRu(d.ct) : '')}${line('аренд.', d.r)}${line('собств.', d.o)}
+        ${d.ot ? `<div style="color:${ownColor(d.ot)};font-size:10px;margin-top:3px">${escapeHtml(ruOwn(d.ot))}</div>` : ''}`
+        : `<div style="color:#8b91a8;font-size:10px;margin-top:2px">данные совета не загружены — откройте село</div>`}
+      </div>
+      ${sib.length >= 2 ? `<div style="color:#8b91a8;font-size:10px;margin-top:4px">Роскадастр разделил этот надел; здесь показан один из ${sib.length} участков.</div>` : ''}
+    </div>`;
+}
 function rfPopup(p) {
   const row = (k, v) => v ? `<div style="margin-top:3px"><span style="color:#8b91a8;font-size:10px">${k}:</span> ${escapeHtml(String(v))}</div>` : '';
-  return `<div style="font-size:12px;max-width:300px">
-    <div style="font-family:'IBM Plex Mono',monospace;color:#ff5d5d;font-weight:600">${escapeHtml(p.cad || '')}</div>
-    ${p.a != null ? `<div style="color:#8b91a8;font-size:11px">${p.a} га</div>` : ''}
-    ${row('Адрес', p.ad)}${row('Категория', p.cat)}${row('Использование', p.use)}${row('Назначение', p.n)}
-    <div style="margin-top:5px;font-size:10px;color:#8b91a8">Роскадастр · КПТ 94:21:1010004</div></div>`;
+  return `<div style="font-size:12px;max-width:320px;color:#e8e8ea">
+    <div style="color:#ff4d4d;font-weight:600;font-size:11px">🇷🇺 Роскадастр</div>
+    <div style="margin-top:5px;padding:5px 8px;background:rgba(255,77,77,0.12);border:1px solid #ff4d4d;border-radius:3px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-family:'IBM Plex Mono',monospace;color:#ff8a8a;font-weight:600;font-size:11px">${escapeHtml(p.cad || '')}</span>
+        ${p.cad ? copyBtn(p.cad, 'Скопировать кадастр РФ') : ''}
+      </div>
+      ${p.a != null ? `<div style="color:#ddd;font-size:11px">${p.a} га</div>` : ''}
+      ${row('Адрес', p.ad)}${row('Категория', p.cat)}${row('Использование', p.use)}${row('Назначение', p.n)}
+    </div>
+    ${uaCardForRf(p.cad)}
+    <div style="margin-top:5px;font-size:10px;color:#8b91a8">КПТ 94:21:1010004</div></div>`;
 }
 function toggleRfLayer(key, on) {
   const L_ = RF_LAYERS[key];
@@ -890,8 +954,10 @@ function toggleRfLayer(key, on) {
       fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
     }
     if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
+    loadRfMatch();   // индекс связей нужен попапам обоих слоёв
   } else if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
 }
+loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
 document.getElementById('rf-parcels').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
 document.getElementById('rf-builds').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
 
@@ -2232,7 +2298,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v29';
+const BUILD_VERSION = 'v30';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
