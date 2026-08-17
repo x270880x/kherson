@@ -358,8 +358,8 @@
   <button id="mobile-filters-btn" type="button" aria-label="Фильтры" title="Фильтры">☰</button>
   <aside class="left">
     <div class="filter-group">
-      <label style="white-space:nowrap">Поиск (село, кадастр, ФИО)</label>
-      <input id="search" type="text" placeholder="напр. 90:01:0101015:1234" autocomplete="off"/>
+      <label style="white-space:nowrap">Поиск (село, кадастр УКР и РФ, ФИО)</label>
+      <input id="search" type="text" placeholder="6522110100:01:001:2490 или 94:21:1010004:22013" autocomplete="off"/>
       <div id="search-results"></div>
     </div>
 
@@ -1033,8 +1033,10 @@ function razmezhStyle() {
 // Слой РФ-межевания (как в бете): фильтр «Размежёванные» подсвечивает размежёванные участки фиолетовым — на любом зуме и в любом режиме
 let razmezhLayer = null;
 function syncRazmezh() {
-  // видно: всегда при фильтре «Размежёванные»; и по умолчанию в режиме «Вся карта» (кроме явного «Не размежёванные»)
-  if (mzLayerOn || filterMz === 'yes' || (ownMode === 'all' && filterMz !== 'no')) {
+  // Единственный хозяин видимости — галочка «Размежёванные» в панели слоёв (mzLayerOn).
+  // Режим «Вся карта» и фильтр «Размежёванные» только СТАВЯТ галочку (см. setMzLayerChecked),
+  // но не перебивают её: раньше условие включало сам режим, и снять слой в «Вся карта» было нельзя.
+  if (mzLayerOn) {
     if (!razmezhLayer) {
       razmezhLayer = L.geoJSON(null, { interactive: false, style: razmezhStyle });
       fetch('razmezh.geojson').then(r => r.json()).then(d => razmezhLayer.addData(d)).catch(() => {});
@@ -1212,9 +1214,16 @@ function applyUaLayer(on) {
   }
   updUaCount();
 }
-// Слой «Размежёванные» (razmezh.geojson) — независимая галочка, без привязки к фильтру
+// Слой «Размежёванные» (razmezh.geojson) — галочка в панели слоёв, она же единственный источник правды
 let mzLayerOn = false;
 function applyMzLayer(on) { mzLayerOn = on; syncRazmezh(); }
+// Поставить галочку программно (вход в «Вся карта», выбор фильтра «Размежёванные», сброс).
+// Именно СТАВИТ — дальше пользователь волен снять, и слой действительно уйдёт с карты.
+function setMzLayerChecked(on) {
+  const cb = document.getElementById('ly-mz');
+  if (cb) cb.checked = on;
+  applyMzLayer(on);
+}
 document.getElementById('ly-ua').addEventListener('change', e => applyUaLayer(e.target.checked));
 document.getElementById('ly-mz').addEventListener('change', e => applyMzLayer(e.target.checked));
 document.getElementById('ly-rf').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
@@ -1726,7 +1735,7 @@ function setOwnMode(mode, noFly) {   // noFly: вид уже выставлен 
     if (!noFly) flyOverview(true);   // «По сёлам»: тот же обзор, привязанный к экрану (как у «Вся карта»)
   }
   applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
-  syncRazmezh();          // межевание видно по умолчанию в «Вся карта»
+  setMzLayerChecked(ownMode === 'all' ? filterMz !== 'no' : filterMz === 'yes');   // умолчание режима: в «Вся карта» межевание включено, в «По сёлам» — только под фильтр
   setHoverParcel(null); syncBasketOverlay(); syncHiZoomOutlines();   // ободки/контуры — под текущий режим
   applyOwnModeUI();
 }
@@ -1919,12 +1928,20 @@ function openCadastr(cad) {
   window.open(`https://kadastr.live/parcel/${cad}`, '_blank');
 }
 
+// РФ-номер для украинского участка. Сначала поле `mz` из самих данных (официальное
+// размежевание), иначе — из пространственного сопоставления с КПТ Геническа
+// (rf/genichesk_match.json). Роскадастр мог разделить надел на несколько участков —
+// тогда все номера через запятую.
+function rfCadsFor(uaCad) {
+  const a = RFM && RFM.ua2rf ? RFM.ua2rf[uaCad] : null;
+  return a && a.length ? a.join(', ') : '';
+}
 function parcelsToRows(parcels, council) {
   const _np = nameParts(council.name);                          // «укр (рус)» → {ru, ua}
   const _sovet = _np.ua ? `${_np.ru} (${_np.ua})` : _np.ru;     // русское в приоритете, украинское в скобках
   return parcels.map(p => ({
     'Кадастровый номер (УКР)': p.c,
-    'Кадастровый номер (РФ)': p.mz || '',
+    'Кадастровый номер (РФ)': p.mz || rfCadsFor(p.c),
     'Площадь, га': p.a,
     'Регион': council.region || '',
     'Сельсовет': _sovet,
@@ -2129,7 +2146,7 @@ document.getElementById('filter-category').addEventListener('change', e => {
 });
 document.getElementById('filter-mz').addEventListener('change', e => {
   filterMz = e.target.value;
-  syncRazmezh();   // подсветка размежёванных фиолетовым (как в бете)
+  setMzLayerChecked(filterMz === 'yes' || (ownMode === 'all' && filterMz !== 'no'));   // фильтр ставит галочку, снять её пользователь может сам
   buildMarkers();
   if (activeCode) showDetail(activeCode);
 });
@@ -2346,7 +2363,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
   document.getElementById('filter-renter').value = '';
   document.getElementById('filter-category').value = '';
   document.getElementById('filter-mz').value = '';
-  syncRazmezh();   // снять подсветку межевания
+  setMzLayerChecked(ownMode === 'all');   // сброс — к умолчанию режима
   document.getElementById('search').value = '';
   document.getElementById('search-results').style.display = 'none';
   if (ownMode === 'all') {   // «Вся карта»: сброс = все формы снова видимы, чекбоксы отмечены, тайлы перерисованы (кружки в этом режиме не нужны)
@@ -2440,6 +2457,7 @@ async function navigateToParcel(cadnum) {
     const pdata = (council.parcels || []).find(p => p.c === cadnum);
     target.bindPopup(buildParcelPopup(cadnum, pdata, council));
     setTimeout(() => target.openPopup(), 600);
+    sr.innerHTML = ''; sr.style.display = 'none';   // нашли — убираем список, иначе висел прошлый ответ поиска
     // Briefly highlight
     target.setStyle({ weight: 3, color: '#ff0' });
     setTimeout(() => layer.resetStyle(target), 3000);
@@ -2453,6 +2471,58 @@ async function navigateToParcel(cadnum) {
 const CADNUM_RE = /^\d{10}:\d{2}:\d{3}:\d{4}$/;        // украинский кадастр
 const RF_CADNUM_RE = /^\d{2}:\d{2}:\d{5,7}:\d{1,}$/;   // кадастр РФ (напр. 90:01:0101015:1234)
 
+// ── Поиск по кадастру РФ (данные есть по КПТ Геническа: 6 782 участка + 17 281 здание) ──
+// Украинский кадастр начинается с 10 цифр, РФ — с двух и двоеточия: различаем по этому.
+function rfShort(o) { return [o.ad, o.m2 != null ? Math.round(o.m2).toLocaleString('ru') + ' м²' : '', o.n || o.use || ''].filter(Boolean).join(' · '); }
+// Показать объект РФ на карте: включить нужный слой, подвезти геометрию, открыть карточку
+async function gotoRf(key, cad) {
+  const L_ = RF_LAYERS[key];
+  if (!L_.data) { try { L_.data = await fetch(L_.file).then(r => r.json()); } catch (e) { return false; } }
+  const f = L_.data.features.find(x => x.properties.cad === cad);
+  if (!f) return false;
+  const cb = document.getElementById(key === 'builds' ? 'ly-bld' : 'ly-rf');
+  if (cb && !cb.checked) { cb.checked = true; toggleRfLayer(key, true); }
+  loadCouncilPolygons('6522110100');                    // украинский контекст под РФ-объектом
+  const bb = featBB(f);
+  map.setView([(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2], key === 'builds' ? 18 : 17);
+  setTimeout(() => L.popup({ maxWidth: 360 }).setLatLng([(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2])
+    .setContent((key === 'builds' ? bldPopup : rfPopup)(f.properties)).openOn(map), 400);
+  return true;
+}
+function rfSearch(q) {
+  const say = html => { sr.innerHTML = html; sr.style.display = 'block'; };
+  if (!RFM) { loadRfMatch(); say('<div class="item" style="color:var(--muted)">Индекс Роскадастра ещё загружается — повторите через секунду</div>'); return; }
+  const asParcel = RFM.rf[q], asBuild = RFM.b[q];
+  if (asParcel || asBuild) {                            // точный номер — сразу ведём к объекту
+    // Участок с украинской парой открываем как НАШ участок: в его карточке уже оба кадастра.
+    // Здание ведём к самому зданию — в карточке дома и так есть участок, на котором он стоит.
+    const ua = asParcel ? RFM.rf2ua[q] : null;
+    if (ua) { navigateToParcel(ua); return; }
+    gotoRf(asParcel ? 'parcels' : 'builds', q).then(okey => {
+      if (!okey) say(`<div class="item" style="color:var(--muted)">Номер <b style="color:var(--text)">${escapeHtml(q)}</b> есть в выгрузке, но без контура — показать на карте нечего</div>`);
+      else sr.style.display = 'none';
+    });
+    return;
+  }
+  if (q.length >= 5) {                                  // частичный номер — подсказки
+    const hits = [];
+    for (const cad in RFM.rf) { if (cad.startsWith(q)) { hits.push({ cad, kind: 'parcels', o: RFM.rf[cad] }); if (hits.length >= 20) break; } }
+    if (hits.length < 20) for (const cad in RFM.b) { if (cad.startsWith(q)) { hits.push({ cad, kind: 'builds', o: RFM.b[cad] }); if (hits.length >= 20) break; } }
+    if (hits.length) {
+      say(hits.map((h, i) => `<div class="item" data-rf="${i}">
+          <div class="cad">${escapeHtml(h.cad)}<span style="color:var(--muted);font-size:10px"> · ${h.kind === 'builds' ? 'здание' : 'участок'}</span></div>
+          <div class="who">${escapeHtml(rfShort(h.o))}</div>
+        </div>`).join(''));
+      sr.querySelectorAll('.item[data-rf]').forEach((el, i) => el.addEventListener('click', () => {
+        const h = hits[i], ua = h.kind === 'parcels' ? RFM.rf2ua[h.cad] : null;
+        if (ua) navigateToParcel(ua); else { gotoRf(h.kind, h.cad); sr.style.display = 'none'; }
+      }));
+      return;
+    }
+  }
+  say(`<div class="item" style="color:var(--muted)">По РФ-кадастру <b style="color:var(--text)">${escapeHtml(q)}</b> ничего нет. Выгрузка Роскадастра пока загружена только по Геническу — квартал <b style="color:var(--text)">94:21:1010004</b>.</div>`);
+}
+
 search.addEventListener('input', e => {
   const q = e.target.value.trim();
   if (q.length < 3) { sr.style.display = 'none'; return; }
@@ -2461,10 +2531,9 @@ search.addEventListener('input', e => {
     navigateToParcel(q);
     return;
   }
-  // Кадастр РФ: формат распознаём, но данных по РФ-номерам в базе нет
-  if (RF_CADNUM_RE.test(q)) {
-    sr.innerHTML = `<div class="item" style="color:var(--muted)">РФ-кадастр <b style="color:var(--text)">${escapeHtml(q)}</b> — база ведётся по украинскому кадастру, данных по РФ-номерам нет</div>`;
-    sr.style.display = 'block';
+  // Кадастр РФ — полный номер или начало (украинский начинается с 10 цифр, РФ — с двух и двоеточия)
+  if (RF_CADNUM_RE.test(q) || /^\d{2}:/.test(q)) {
+    rfSearch(q);
     return;
   }
   // Partial cadnum starting with digits: suggest opening council
@@ -2576,7 +2645,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v47';
+const BUILD_VERSION = 'v48';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
