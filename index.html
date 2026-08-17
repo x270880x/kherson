@@ -241,6 +241,20 @@
   .fullmap-hint { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15,17,23,0.92); border: 1px solid var(--border); color: var(--text); font-size: 12px; padding: 6px 12px; border-radius: 6px; pointer-events: none; display: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
   .fullmap-hint.show { display: block; }
   /* Подписи городов/сёл в режиме «Полная карта» */
+  /* Карточки объединённого попапа: единая сетка «подпись — значение» */
+  .pc { margin-top: 6px; padding: 7px 9px; border-radius: 4px; border: 1px solid; }
+  .pc-ua { background: rgba(232,197,71,.08); border-color: #e8c547; }
+  .pc-rf { background: rgba(255,77,77,.08); border-color: #ff4d4d; }
+  .pc-bl { background: rgba(240,192,74,.07); border-color: #f0c04a; }
+  .pc-cad { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .pc-cad span { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 600; word-break: break-all; }
+  .pc-row { display: grid; grid-template-columns: 92px 1fr; gap: 4px 8px; font-size: 11px; line-height: 1.4; margin-top: 2px; }
+  .pc-row > i { color: #8b93a5; font-style: normal; }
+  .pc-row > b { font-weight: 400; color: #e2e6ee; min-width: 0; word-break: break-word; }
+  .pc-num { font-variant-numeric: tabular-nums; }
+  .pc-dim { color: #8b93a5; }
+  .pc-h { font-weight: 600; font-size: 11px; letter-spacing: .03em; }
+  .pc-sec { margin-top: 8px; border-top: 1px solid #2b3140; padding-top: 7px; }
   .pop-scroll::-webkit-scrollbar { width: 7px; }
   .pop-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 4px; }
   .pop-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.20); border-radius: 4px; }
@@ -751,79 +765,78 @@ function loadRfMatch() {
   return _rfmLoading;
 }
 // Карточка одного РФ-участка (в рамке) — используется и в нашем попапе, и в попапе РФ-слоя
-// Строка «ключ — значение» внутри карточки кадастра
-function kvHTML(k, v, color) {
-  return v ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px;line-height:1.35">
-      <span style="color:#8b93a5;flex:0 0 74px">${k}</span>
-      <span style="color:${color || '#e2e6ee'};flex:1;min-width:0;word-break:break-word">${escapeHtml(String(v))}</span></div>` : '';
+// ── Объединённая карточка участка: строки «подпись — значение» в единой сетке ──
+const pcRow = (k, v, cls) => v ? `<div class="pc-row"><i>${k}</i><b class="${cls||''}">${escapeHtml(String(v))}</b></div>` : '';
+const pcRowHTML = (k, html) => html ? `<div class="pc-row"><i>${k}</i><b>${html}</b></div>` : '';
+const fmtM2 = m2 => Math.round(m2).toLocaleString('ru') + ' м²';
+const fmtGa = ga => ga.toLocaleString('ru', { maximumFractionDigits: 4 }) + ' га';
+// «619 м² (0,0619 га) ±9 м²»
+function areaHTML(m2, ga, pm) {
+  if (m2 == null && ga == null) return '';
+  if (m2 == null) m2 = ga * 10000;
+  if (ga == null) ga = m2 / 10000;
+  return `<span class="pc-num">${fmtM2(m2)}</span> <span class="pc-dim pc-num">(${fmtGa(ga)})</span>` +
+         (pm ? ` <span class="pc-dim pc-num">±${Math.round(pm)} м²</span>` : '');
 }
-// Площадь человеческим видом: «619 м² (0,062 га) ±9 м²»
-function areaHTML(a) {
-  if (a.m2 == null && a.a == null) return '';
-  const m2 = a.m2 != null ? Math.round(a.m2).toLocaleString('ru') + ' м²' : '';
-  const ga = a.a != null ? a.a.toLocaleString('ru', { maximumFractionDigits: 4 }) + ' га' : '';
-  const pm = a.pm ? ` <span style="color:#8b93a5">±${Math.round(a.pm)} м²</span>` : '';
-  return (m2 && ga) ? `${m2} <span style="color:#8b93a5">(${ga})</span>${pm}` : (m2 || ga) + pm;
-}
-// Карточка кадастра РФ (красная рамка)
+const cadLine = (cad, color, title) => `<div class="pc-cad"><span style="color:${color}">${escapeHtml(cad)}</span>${copyBtn(cad, title)}</div>`;
+
+// Карточка РФ-кадастра
 function rfCardHTML(rfCad, attrs) {
   const a = attrs || (RFM && RFM.rf[rfCad]) || {};
-  return `<div style="margin-top:6px;padding:7px 9px;background:rgba(255,77,77,.09);border:1px solid #ff4d4d;border-radius:4px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#ff9a9a;font-weight:600">${escapeHtml(rfCad)}</span>
-        ${copyBtn(rfCad, 'Скопировать кадастр РФ')}
-      </div>
-      ${areaHTML(a) ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">площадь</span><span style="flex:1">${areaHTML(a)}</span></div>` : ''}
-      ${kvHTML('категория', a.cat)}
-      ${kvHTML('использование', a.use)}
-      ${kvHTML('адрес', a.ad, '#cfd6e4')}
+  return `<div class="pc pc-rf">
+      ${cadLine(rfCad, '#ff9a9a', 'Скопировать кадастр РФ')}
+      ${pcRowHTML('площадь', areaHTML(a.m2, a.a, a.pm))}
+      ${pcRow('категория', a.cat)}
+      ${pcRow('использование', a.use)}
+      ${pcRow('адрес', a.ad)}
     </div>`;
 }
-// Карточка здания (янтарная рамка)
+// Карточка украинского кадастра
+function uaCardHTML(uaCad, d, council) {
+  if (!d) return `<div class="pc pc-ua">${cadLine(uaCad, '#e8c547', 'Скопировать кадастр (УКР)')}
+      <div class="pc-dim" style="font-size:10.5px">данные совета не загружены — откройте село</div></div>`;
+  return `<div class="pc pc-ua">
+      ${cadLine(uaCad, '#e8c547', 'Скопировать кадастр (УКР)')}
+      ${pcRowHTML('площадь', d.a != null ? areaHTML(null, d.a, null) : '')}
+      ${d.ot ? `<div class="pc-row"><i>собственность</i><b style="color:${ownColor(d.ot)}">${escapeHtml(ruOwn(d.ot))}</b></div>` : ''}
+      ${pcRow('назначение', d.ct ? catRu(d.ct) : '')}
+      ${pcRow('арендатор', d.r)}
+      ${pcRow('собственник', d.o)}
+      ${d.ed ? `<div class="pc-row"><i>договор до</i><b style="color:${d.ey && d.ey < 2026 ? '#ff7575' : '#e2e6ee'}">${escapeHtml(d.ed)}${d.cn ? ' · №' + escapeHtml(d.cn) : ''}</b></div>` : ''}
+    </div>`;
+}
+// Карточка здания
 function bldCardHTML(cad) {
   const b = (RFM && RFM.b && RFM.b[cad]) || {};
-  return `<div style="margin-top:6px;padding:6px 9px;background:rgba(240,192,74,.08);border:1px solid #f0c04a;border-radius:4px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#f0c04a;font-weight:600">${escapeHtml(cad)}</span>
-        ${copyBtn(cad, 'Скопировать кадастр здания')}
-      </div>
-      ${b.m2 != null ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">площадь</span><span style="flex:1">${b.m2.toLocaleString('ru')} м²</span></div>` : ''}
-      ${kvHTML('назначение', b.n)}
-      ${kvHTML('адрес', b.ad, '#cfd6e4')}
+  const known = b.m2 != null || b.n;
+  return `<div class="pc pc-bl">
+      ${cadLine(cad, '#f0c04a', 'Скопировать кадастр здания')}
+      ${pcRowHTML('площадь', b.m2 != null ? `<span class="pc-num">${fmtM2(b.m2)}</span>` : '')}
+      ${pcRow('назначение', b.n)}
+      ${pcRow('адрес', b.ad)}
+      ${!known ? `<div class="pc-dim" style="font-size:10px;margin-top:3px">площадь и назначение в этой выгрузке не указаны</div>` : ''}
     </div>`;
 }
-// Блок «Здания на участке» — по нашему ИЛИ по РФ-кадастру
-function bldBlockHTML(parcelCad) {
-  if (!RFM || !RFM.p2b) return '';
-  const ids = RFM.p2b[parcelCad];
+// Блок зданий
+function bldListHTML(ids) {
   if (!ids || !ids.length) return '';
-  return `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:7px">
-      <div style="color:#f0c04a;font-weight:600;font-size:11px;letter-spacing:.02em">🏠 ЗДАНИЯ НА УЧАСТКЕ — ${ids.length}</div>
+  const withArea = ids.filter(i => RFM.b[i] && RFM.b[i].m2 != null);
+  const sum = withArea.reduce((s, i) => s + RFM.b[i].m2, 0);
+  const note = withArea.length ? ` · ${fmtM2(sum)}${withArea.length < ids.length ? ` у ${withArea.length} из ${ids.length}` : ''}` : '';
+  return `<div class="pc-sec">
+      <div class="pc-h" style="color:#f0c04a">🏠 ЗДАНИЯ НА УЧАСТКЕ — ${ids.length}<span class="pc-dim" style="font-weight:400">${note}</span></div>
       ${ids.map(bldCardHTML).join('')}
     </div>`;
 }
-// Карточка украинского кадастра (жёлтая рамка)
-function uaCardHTML(uaCad, d, council) {
-  return `<div style="margin-top:6px;padding:7px 9px;background:rgba(232,197,71,.09);border:1px solid #e8c547;border-radius:4px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#e8c547;font-weight:600">${escapeHtml(uaCad)}</span>
-        ${copyBtn(uaCad, 'Скопировать кадастр (УКР)')}
-      </div>
-      ${d ? `
-      ${d.a != null ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">площадь</span><span style="flex:1">${Math.round(d.a * 10000).toLocaleString('ru')} м² <span style="color:#8b93a5">(${d.a} га)</span></span></div>` : ''}
-      ${d.ot ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">собственность</span><span style="flex:1;color:${ownColor(d.ot)}">${escapeHtml(ruOwn(d.ot))}</span></div>` : ''}
-      ${kvHTML('назначение', d.ct ? catRu(d.ct) : '')}
-      ${kvHTML('арендатор', d.r)}
-      ${kvHTML('собственник', d.o)}
-      ${kvHTML('договор до', d.ed ? `${d.ed}${d.cn ? ' · №' + d.cn : ''}` : '', d.ey && d.ey < 2026 ? '#ff7575' : '#e2e6ee')}
-      ` : `<div style="color:#8b93a5;font-size:10.5px">данные совета не загружены — откройте село</div>`}
-    </div>`;
+function bldBlockHTML(parcelCad) {
+  if (!RFM || !RFM.p2b) return '';
+  return bldListHTML(RFM.p2b[parcelCad]);
 }
-// Общая шапка объединённой карточки: адрес крупно + село/район
+// Общая шапка: адрес крупно + село/район
 function cardHeadHTML(addr, sub) {
-  return `<div style="margin-bottom:2px">
+  return `<div>
       ${addr ? `<div style="font-size:13px;font-weight:600;color:#f2f4f8;line-height:1.3;word-break:break-word">${escapeHtml(addr)}</div>` : ''}
-      ${sub ? `<div style="font-size:10.5px;color:#8b93a5;margin-top:1px">${escapeHtml(sub)}</div>` : ''}
+      ${sub ? `<div class="pc-dim" style="font-size:10.5px;margin-top:1px">${escapeHtml(sub)}</div>` : ''}
     </div>`;
 }
 // Блок Роскадастра для нашего участка
@@ -2370,7 +2383,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v33';
+const BUILD_VERSION = 'v34';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
