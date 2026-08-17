@@ -1019,9 +1019,11 @@ const RF_LAYERS = {
   // РФ рисуем ТОНКИМ ПУНКТИРОМ поверх наших сплошных: где границы совпали — линия читается как
   // двухцветная (наш цвет + красные штрихи); где участок есть только у РФ — только красный пунктир.
   parcels: { file: 'rf/genichesk_parcels.geojson', layer: null,
-             style: { color: '#ff4d4d', weight: 1, dashArray: '4,3', fill: true, fillColor: '#ff4d4d', fillOpacity: 0.05 } },
+             style: { color: '#ff4d4d', weight: 1, dashArray: '4,3', fill: true, fillColor: '#ff4d4d', fillOpacity: 0.05 },
+             hover: { color: '#ffffff', weight: 2.6, dashArray: null, fill: true, fillColor: '#ff4d4d', fillOpacity: 0.30 } },
   builds:  { file: 'rf/genichesk_buildings.geojson', layer: null,
-             style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 } },
+             style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 },
+             hover: { color: '#ffffff', weight: 2.2, fillColor: '#ffe08a', fillOpacity: 0.62 } },
 };
 // Блок украинского кадастра для РФ-участка
 function uaCardForRf(rfCad) {
@@ -1056,6 +1058,13 @@ function toggleRfLayer(key, on) {
     if (!L_.layer) {
       const mk = key === 'builds' ? bldPopup : rfPopup;   // у зданий свой попап (дом + участок под ним)
       L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
+      // подсветка при наведении (делегируем на слой, а не вешаем обработчики на тысячи объектов)
+      L_.layer.on('mouseover', e => {
+        e.layer.setStyle(L_.hover);
+        if (e.layer.bringToFront) e.layer.bringToFront();
+        map.getContainer().style.cursor = 'pointer';
+      });
+      L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
       fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
     }
     if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
@@ -2417,7 +2426,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v36';
+const BUILD_VERSION = 'v37';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
