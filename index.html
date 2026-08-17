@@ -285,11 +285,12 @@
   .rt-hover-pop .leaflet-popup-content { margin: 7px 9px; }
   .rt-hover-pop .leaflet-popup-tip { background: #fff; }
   /* Технический блок (зум + версия) — правый нижний угол */
-  #techinfo { position: fixed; right: 10px; bottom: 10px; z-index: 1200; pointer-events: none;
-             font: 600 12px/1.2 'IBM Plex Mono', monospace; color: #ffd873;
-             background: rgba(10,12,18,0.88); border: 1px solid rgba(255,216,115,0.45);
-             border-radius: 5px; padding: 5px 9px; letter-spacing: .4px; white-space: nowrap;
-             box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  #techinfo { position: fixed; right: 12px; bottom: 12px; z-index: 1200; pointer-events: none;
+             font: 700 15px/1.2 'IBM Plex Mono', monospace; color: #ffd873;
+             background: rgba(10,12,18,0.92); border: 1px solid rgba(255,216,115,0.55);
+             border-radius: 6px; padding: 7px 12px; letter-spacing: .5px; white-space: nowrap;
+             box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+  @media (max-width: 768px) { #techinfo { font-size: 13px; padding: 5px 9px; right: 8px; bottom: 8px; } }
 
   /* Search results pane */
   #search-results { max-height: 180px; overflow-y: auto; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; margin-top: 4px; display: none; }
@@ -2448,7 +2449,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v45';
+const BUILD_VERSION = 'v46';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
