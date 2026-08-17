@@ -1064,10 +1064,12 @@ function toggleRfLayer(key, on) {
 }
 loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
 // Кнопка «Показать Геническ»: включает оба слоя и летит к кварталу (данные пока только по нему)
-document.getElementById('rf-goto').addEventListener('click', () => {
-  // сначала переносим вид (setView, а не flyTo: отрисовка тысяч объектов прерывает анимацию),
-  // слои включаем следующим кадром — иначе перелёт не доезжает
+document.getElementById('rf-goto').addEventListener('click', async () => {
+  // сначала переносим вид (setView, а не flyTo: отрисовка тысяч объектов прерывает анимацию)
   map.setView([46.1745, 34.8065], 16);
+  // ВАЖНО: в режиме «По сёлам» украинские участки рисуются только для ОТКРЫТОГО села —
+  // без этого на экране были бы одни РФ-слои и казалось бы, что укр. данные пропали
+  loadCouncilPolygons('6522110100');
   setTimeout(() => {
     for (const [id, key] of [['rf-parcels','parcels'], ['rf-builds','builds']]) {
       const cb = document.getElementById(id);
@@ -2415,7 +2417,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v35';
+const BUILD_VERSION = 'v36';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
