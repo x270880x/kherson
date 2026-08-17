@@ -342,6 +342,18 @@
       </select>
     </div>
 
+    <div class="filter-group" id="rf-layers">
+      <label>Роскадастр — Геническ (КПТ 94:21:1010004)</label>
+      <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-top:3px">
+        <input type="checkbox" id="rf-parcels" style="width:13px;height:13px;accent-color:#ff5d5d;margin:0">
+        <span style="width:11px;height:3px;background:#ff5d5d;border-radius:2px;flex-shrink:0"></span>Участки РФ <span style="color:var(--muted);font-size:10px">6 793</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:7px;font-weight:400;text-transform:none;letter-spacing:0;cursor:pointer;margin-top:3px">
+        <input type="checkbox" id="rf-builds" style="width:13px;height:13px;accent-color:#f0c04a;margin:0">
+        <span style="width:11px;height:3px;background:#f0c04a;border-radius:2px;flex-shrink:0"></span>Здания <span style="color:var(--muted);font-size:10px">17 281</span>
+      </label>
+    </div>
+
     <div class="filter-group">
       <label>Категория земель (УКР)</label>
       <select id="filter-category">
@@ -852,6 +864,36 @@ function syncRazmezh() {
     map.removeLayer(razmezhLayer);
   }
 }
+
+// ── Слои Роскадастра (КПТ 94:21:1010004, Геническ): участки + здания. Проекция СК-63 X5 (EPSG:7829) + 5 м ──
+const RF_LAYERS = {
+  // РФ рисуем ТОНКИМ ПУНКТИРОМ поверх наших сплошных: где границы совпали — линия читается как
+  // двухцветная (наш цвет + красные штрихи); где участок есть только у РФ — только красный пунктир.
+  parcels: { file: 'rf/genichesk_parcels.geojson', layer: null,
+             style: { color: '#ff4d4d', weight: 1, dashArray: '4,3', fill: true, fillColor: '#ff4d4d', fillOpacity: 0.05 } },
+  builds:  { file: 'rf/genichesk_buildings.geojson', layer: null,
+             style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 } },
+};
+function rfPopup(p) {
+  const row = (k, v) => v ? `<div style="margin-top:3px"><span style="color:#8b91a8;font-size:10px">${k}:</span> ${escapeHtml(String(v))}</div>` : '';
+  return `<div style="font-size:12px;max-width:300px">
+    <div style="font-family:'IBM Plex Mono',monospace;color:#ff5d5d;font-weight:600">${escapeHtml(p.cad || '')}</div>
+    ${p.a != null ? `<div style="color:#8b91a8;font-size:11px">${p.a} га</div>` : ''}
+    ${row('Адрес', p.ad)}${row('Категория', p.cat)}${row('Использование', p.use)}${row('Назначение', p.n)}
+    <div style="margin-top:5px;font-size:10px;color:#8b91a8">Роскадастр · КПТ 94:21:1010004</div></div>`;
+}
+function toggleRfLayer(key, on) {
+  const L_ = RF_LAYERS[key];
+  if (on) {
+    if (!L_.layer) {
+      L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => rfPopup(f.properties)) });
+      fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
+    }
+    if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
+  } else if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
+}
+document.getElementById('rf-parcels').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
+document.getElementById('rf-builds').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
 
 // ===== Подписи НП «как на бете»: тот же источник (councils-index.json), те же центры/координаты/имена и правила кликов =====
 const isUrban = n => /^(смт|пгт|м\.|город)(\s|$)/i.test(n || '');   // урбан-НП (для выбора центра района)
@@ -2190,7 +2232,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v28';
+const BUILD_VERSION = 'v29';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
