@@ -1081,8 +1081,33 @@ function rfPopup(p) {
 // Слои Роскадастра тяжёлые (6.8k участков + 17k зданий). На отдалении они все попадают в кадр,
 // перерисовка canvas занимает ~3 с, и всё это время Leaflet показывает РАСТЯНУТУЮ копию —
 // пользователь видит размытое пятно во весь экран. Поэтому рисуем их только вблизи.
-const RF_MIN_ZOOM = { parcels: 14, builds: 15 };
+// Слои Роскадастра тяжёлые (6.8k участков + 17k зданий). Две меры, чтобы карта не «залипала»:
+//  1) порог зума — на обзоре они всё равно нечитаемы;
+//  2) ОТСЕЧЕНИЕ ПО ЭКРАНУ — на canvas отдаём только то, что попадает в кадр (+запас),
+//     иначе Leaflet перебирает все 24 тыс. объектов на каждый зум (~3–4 с) и всё это время
+//     показывает РАСТЯНУТУЮ копию прошлого кадра — это и выглядело как размытое пятно.
+const RF_MIN_ZOOM = { parcels: 15, builds: 17 };
 const rfWanted = { parcels: false, builds: false };
+function featBB(f) {                       // bbox фичи, считаем один раз
+  if (f._bb) return f._bb;
+  let W = 1e9, S = 1e9, E = -1e9, N = -1e9;
+  const scan = r => r.forEach(p => { if (p[0] < W) W = p[0]; if (p[0] > E) E = p[0]; if (p[1] < S) S = p[1]; if (p[1] > N) N = p[1]; });
+  const g = f.geometry;
+  if (g.type === 'Polygon') g.coordinates.forEach(scan);
+  else if (g.type === 'MultiPolygon') g.coordinates.forEach(pp => pp.forEach(scan));
+  return (f._bb = [W, S, E, N]);
+}
+function rfRender(key) {                   // перерисовать слой только видимыми объектами
+  const L_ = RF_LAYERS[key];
+  if (!L_.data || !L_.layer || !map.hasLayer(L_.layer)) return;
+  const b = map.getBounds().pad(0.12);   // небольшой запас, чтобы при панораме не мигало
+  const W = b.getWest(), S = b.getSouth(), E = b.getEast(), N = b.getNorth();
+  const vis = L_.data.features.filter(f => { const q = featBB(f); return q[2] >= W && q[0] <= E && q[3] >= S && q[1] <= N; });
+  if (L_.shown === vis.length && L_.key === `${W.toFixed(4)},${S.toFixed(4)},${E.toFixed(4)}`) return;
+  L_.shown = vis.length; L_.key = `${W.toFixed(4)},${S.toFixed(4)},${E.toFixed(4)}`;
+  L_.layer.clearLayers();
+  L_.layer.addData({ type: 'FeatureCollection', features: vis });
+}
 function toggleRfLayer(key, on) {
   rfWanted[key] = on;
   if (on) loadRfMatch();
@@ -1104,11 +1129,15 @@ function applyRfZoomGate() {
           map.getContainer().style.cursor = 'pointer';
         });
         L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
-        fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
       }
       if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
+      if (!L_.data) {
+        if (!L_.loading) L_.loading = fetch(L_.file).then(r => r.json())
+          .then(d => { L_.data = d; L_.shown = -1; rfRender(key); })
+          .catch(e => console.warn('RF layer', key, e));
+      } else rfRender(key);
     } else {
-      if (L_.layer && map.hasLayer(L_.layer)) map.removeLayer(L_.layer);
+      if (L_.layer && map.hasLayer(L_.layer)) { map.removeLayer(L_.layer); L_.shown = -1; }
       if (rfWanted[key]) hidden = Math.max(hidden, RF_MIN_ZOOM[key]);
     }
   }
@@ -1119,6 +1148,7 @@ function applyRfZoomGate() {
   }
 }
 map.on('zoomend', applyRfZoomGate);
+map.on('moveend', () => { for (const k of ['parcels', 'builds']) rfRender(k); });
 loadRfMatch();   // тянем один раз при старте (≈1 МБ) — чтобы блок «Роскадастр» был и в попапе нашего участка
 // ── Панель слоёв: украинские и российские, любые комбинации ──
 // Украинские участки: слои советов рисуются лениво, поэтому храним флаг видимости и применяем ко всем.
@@ -2373,7 +2403,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v40';
+const BUILD_VERSION = 'v41';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
