@@ -1017,13 +1017,20 @@ function syncParcelTiles() {
   });
 }
 
+// Стиль межевания: заливка гаснет при приближении (как в бете), ободок остаётся.
+// Иначе крупные наделы (до 2 900 га) закрывают карту сплошным фиолетовым пятном.
+function razmezhStyle() {
+  const z = map.getZoom();
+  const fo = z <= 10 ? 0.16 : z >= 13 ? 0 : 0.16 * (13 - z) / 3;
+  return { color: '#c050ff', weight: z >= 13 ? 1.8 : 1.2, fillColor: '#c050ff', fillOpacity: fo, fill: fo > 0 };
+}
 // Слой РФ-межевания (как в бете): фильтр «Размежёванные» подсвечивает размежёванные участки фиолетовым — на любом зуме и в любом режиме
 let razmezhLayer = null;
 function syncRazmezh() {
   // видно: всегда при фильтре «Размежёванные»; и по умолчанию в режиме «Вся карта» (кроме явного «Не размежёванные»)
   if (mzLayerOn || filterMz === 'yes' || (ownMode === 'all' && filterMz !== 'no')) {
     if (!razmezhLayer) {
-      razmezhLayer = L.geoJSON(null, { interactive: false, style: { color: '#c050ff', weight: 1.6, fillColor: '#c050ff', fillOpacity: 0.25 } });
+      razmezhLayer = L.geoJSON(null, { interactive: false, style: razmezhStyle });
       fetch('razmezh.geojson').then(r => r.json()).then(d => razmezhLayer.addData(d)).catch(() => {});
     }
     if (!map.hasLayer(razmezhLayer)) razmezhLayer.addTo(map);
@@ -1352,6 +1359,7 @@ function disableFullMap() {
 map.on('overlayadd', e => { if (e.layer === fullMapLayer) enableFullMap(); });
 map.on('overlayremove', e => { if (e.layer === fullMapLayer) disableFullMap(); });
 map.on('moveend zoomend', () => { if (labelsActive()) labelsUpdate(); syncHiZoomOutlines(); });
+map.on('zoomend', () => { if (razmezhLayer && map.hasLayer(razmezhLayer)) razmezhLayer.setStyle(razmezhStyle()); });   // заливка межевания по зуму
 
 let markers = {};
 let activeCode = null;
@@ -2342,7 +2350,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v38';
+const BUILD_VERSION = 'v39';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
