@@ -1048,9 +1048,16 @@ function syncRazmezh() {
 const RF_LAYERS = {
   // РФ рисуем ТОНКИМ ПУНКТИРОМ поверх наших сплошных: где границы совпали — линия читается как
   // двухцветная (наш цвет + красные штрихи); где участок есть только у РФ — только красный пунктир.
+  // Стиль зависит от зума: на z15–16 участки мелкие и 6.5 тыс. красных контуров сливаются
+  // в сплошную сетку, под которой не видно украинских участков — там линия тонкая и приглушённая.
   parcels: { file: 'rf/genichesk_parcels.geojson', layer: null,
-             style: { color: '#ff4d4d', weight: 1, dashArray: '4,3', fill: true, fillColor: '#ff4d4d', fillOpacity: 0.05 },
-             hover: { color: '#ffffff', weight: 2.6, dashArray: null, fill: true, fillColor: '#ff4d4d', fillOpacity: 0.30 } },
+             style: () => {
+               const z = map.getZoom();
+               if (z <= 15) return { color: '#ff4d4d', weight: 0.5, opacity: 0.40, fill: false };
+               if (z === 16) return { color: '#ff4d4d', weight: 0.8, opacity: 0.65, fill: false };
+               return { color: '#ff4d4d', weight: 1, opacity: 0.95, dashArray: '4,3', fill: true, fillColor: '#ff4d4d', fillOpacity: 0.05 };
+             },
+             hover: { color: '#ffffff', weight: 2.6, dashArray: null, opacity: 1, fill: true, fillColor: '#ff4d4d', fillOpacity: 0.30 } },
   builds:  { file: 'rf/genichesk_buildings.geojson', layer: null,
              style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 },
              hover: { color: '#ffffff', weight: 2.2, fillColor: '#ffe08a', fillOpacity: 0.62 } },
@@ -1142,6 +1149,7 @@ function applyRfZoomGate() {
         L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
       }
       if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
+      if (L_.layer && typeof L_.style === 'function') L_.layer.setStyle(L_.style);   // стиль по зуму
       if (!L_.data) {
         if (!L_.loading) L_.loading = fetch(L_.file).then(r => r.json())
           .then(d => { L_.data = d; L_.shown = -1; rfRender(key); })
@@ -2422,7 +2430,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v43';
+const BUILD_VERSION = 'v44';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
