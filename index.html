@@ -745,45 +745,80 @@ function loadRfMatch() {
   return _rfmLoading;
 }
 // Карточка одного РФ-участка (в рамке) — используется и в нашем попапе, и в попапе РФ-слоя
-function rfCardHTML(rfCad, attrs, dim) {
+// Строка «ключ — значение» внутри карточки кадастра
+function kvHTML(k, v, color) {
+  return v ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px;line-height:1.35">
+      <span style="color:#8b93a5;flex:0 0 74px">${k}</span>
+      <span style="color:${color || '#e2e6ee'};flex:1;min-width:0;word-break:break-word">${escapeHtml(String(v))}</span></div>` : '';
+}
+// Площадь человеческим видом: «619 м² (0,062 га) ±9 м²»
+function areaHTML(a) {
+  if (a.m2 == null && a.a == null) return '';
+  const m2 = a.m2 != null ? Math.round(a.m2).toLocaleString('ru') + ' м²' : '';
+  const ga = a.a != null ? a.a.toLocaleString('ru', { maximumFractionDigits: 4 }) + ' га' : '';
+  const pm = a.pm ? ` <span style="color:#8b93a5">±${Math.round(a.pm)} м²</span>` : '';
+  return (m2 && ga) ? `${m2} <span style="color:#8b93a5">(${ga})</span>${pm}` : (m2 || ga) + pm;
+}
+// Карточка кадастра РФ (красная рамка)
+function rfCardHTML(rfCad, attrs) {
   const a = attrs || (RFM && RFM.rf[rfCad]) || {};
-  const line = (k, v) => v ? `<div style="margin-top:1px"><b style="color:#aaa">${k}:</b> ${escapeHtml(String(v))}</div>` : '';
-  return `<div style="margin-top:5px;padding:5px 8px;background:rgba(255,77,77,${dim?0.07:0.12});border:1px solid #ff4d4d;border-radius:3px">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff8a8a;font-weight:600">${escapeHtml(rfCad)}</span>
+  return `<div style="margin-top:6px;padding:7px 9px;background:rgba(255,77,77,.09);border:1px solid #ff4d4d;border-radius:4px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#ff9a9a;font-weight:600">${escapeHtml(rfCad)}</span>
         ${copyBtn(rfCad, 'Скопировать кадастр РФ')}
       </div>
-      ${a.a != null ? `<div style="color:#ddd;font-size:11px">${a.a} га</div>` : ''}
-      ${line('назнач.', a.use)}${line('категория', a.cat)}${line('адрес', a.ad)}
+      ${areaHTML(a) ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">площадь</span><span style="flex:1">${areaHTML(a)}</span></div>` : ''}
+      ${kvHTML('категория', a.cat)}
+      ${kvHTML('использование', a.use)}
+      ${kvHTML('адрес', a.ad, '#cfd6e4')}
     </div>`;
 }
-// Блок «Роскадастр» для нашего участка: один в один либо «поделён на N»
+// Карточка украинского кадастра (жёлтая рамка)
+function uaCardHTML(uaCad, d, council) {
+  return `<div style="margin-top:6px;padding:7px 9px;background:rgba(232,197,71,.09);border:1px solid #e8c547;border-radius:4px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#e8c547;font-weight:600">${escapeHtml(uaCad)}</span>
+        ${copyBtn(uaCad, 'Скопировать кадастр (УКР)')}
+      </div>
+      ${d ? `
+      ${d.a != null ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">площадь</span><span style="flex:1">${Math.round(d.a * 10000).toLocaleString('ru')} м² <span style="color:#8b93a5">(${d.a} га)</span></span></div>` : ''}
+      ${d.ot ? `<div style="display:flex;gap:6px;margin-top:2px;font-size:11px"><span style="color:#8b93a5;flex:0 0 74px">собственность</span><span style="flex:1;color:${ownColor(d.ot)}">${escapeHtml(ruOwn(d.ot))}</span></div>` : ''}
+      ${kvHTML('назначение', d.ct ? catRu(d.ct) : '')}
+      ${kvHTML('арендатор', d.r)}
+      ${kvHTML('собственник', d.o)}
+      ${kvHTML('договор до', d.ed ? `${d.ed}${d.cn ? ' · №' + d.cn : ''}` : '', d.ey && d.ey < 2026 ? '#ff7575' : '#e2e6ee')}
+      ` : `<div style="color:#8b93a5;font-size:10.5px">данные совета не загружены — откройте село</div>`}
+    </div>`;
+}
+// Общая шапка объединённой карточки: адрес крупно + село/район
+function cardHeadHTML(addr, sub) {
+  return `<div style="margin-bottom:2px">
+      ${addr ? `<div style="font-size:13px;font-weight:600;color:#f2f4f8;line-height:1.3;word-break:break-word">${escapeHtml(addr)}</div>` : ''}
+      ${sub ? `<div style="font-size:10.5px;color:#8b93a5;margin-top:1px">${escapeHtml(sub)}</div>` : ''}
+    </div>`;
+}
+// Блок Роскадастра для нашего участка
 function rfBlockForUa(cad) {
   if (!RFM) return '';
   const kids = RFM.ua2rf[cad];
-  if (!kids || !kids.length) return '';
+  if (!kids || !kids.length) return `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:6px;color:#8b93a5;font-size:10.5px">🇷🇺 В Роскадастре этот участок не зарегистрирован</div>`;
   const head = kids.length === 1
-    ? `<div style="color:#ff4d4d;font-weight:600;font-size:11px">🇷🇺 Роскадастр</div>`
-    : `<div style="color:#ff4d4d;font-weight:600;font-size:11px">🇷🇺 Роскадастр — участок поделён на ${kids.length}</div>`;
-  return `<div style="margin-top:7px;border-top:1px solid #333;padding-top:6px">${head}${kids.map(k => rfCardHTML(k)).join('')}</div>`;
+    ? `<div style="color:#ff6b6b;font-weight:600;font-size:11px;letter-spacing:.02em">🇷🇺 РОСКАДАСТР (РФ)</div>`
+    : `<div style="color:#ff6b6b;font-weight:600;font-size:11px;letter-spacing:.02em">🇷🇺 РОСКАДАСТР (РФ) — надел поделён на ${kids.length}</div>`;
+  return `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:7px">${head}${kids.map(k => rfCardHTML(k)).join('')}</div>`;
 }
 function buildParcelPopup(cad, data, council) {
   const inBasket = basket.has(cad);
-  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:6px;padding:4px 10px;background:${inBasket?'#ff6f61':'var(--accent)'};color:#1a1a1a;border:none;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
-  if (!data) {
-    return `<div style="font-size:12px;color:#e8c547"><div style="display:flex;align-items:center;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">${cad}</span>${copyBtn(cad, 'Скопировать кадастр (УКР)')}</div><div style="color:#aaa;font-size:11px">нет данных в базе</div>${basketBtn}</div>`;
-  }
-  const expColor = data.ey && data.ey < 2026 ? '#ff7575' : data.ey && data.ey <= 2027 ? '#ffc66e' : '#e8e8e8';
-  return `
-    <div style="font-size:12px;color:#e8e8e8;max-width:320px;line-height:1.45">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:#e8c547;font-size:13px">${cad}</span>${copyBtn(cad, 'Скопировать кадастр (УКР)')}</div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:6px">${data.a} га · ${council ? escapeHtml(ruName(council.name)) : ''}${raionOf(cad) ? ' · ' + escapeHtml(raionOf(cad)) : ''}</div>
-      ${data.ct ? `<div style="margin-bottom:2px"><b style="color:#aaa">назнач.:</b> ${escapeHtml(catRu(data.ct))}</div>` : ''}
-      ${data.r ? `<div><b style="color:#aaa">аренд.:</b> ${data.r}</div>` : ''}
-      ${data.o ? `<div><b style="color:#aaa">собств.:</b> ${data.o}</div>` : ''}
-      ${data.ed ? `<div><b style="color:#aaa">договор до:</b> <span style="color:${expColor}">${data.ed}</span>${data.cn?` · №${data.cn}`:''}</div>` : ''}
-      ${data.ot ? `<div style="color:${ownColor(data.ot)};font-size:10px;margin-top:4px">${escapeHtml(ruOwn(data.ot))}</div>` : ''}
-      ${data.mz ? `<div style="margin-top:6px;padding:5px 8px;background:rgba(192,80,255,0.15);border:1px solid #c050ff;border-radius:3px"><div style="color:#c050ff;font-weight:600;font-size:11px">🇷🇺 Межевание сделано</div><div style="display:flex;align-items:center;gap:6px;margin-top:2px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff">${data.mz}</span>${copyBtn(data.mz, 'Скопировать кадастр РФ')}</div><div style="color:#aaa;font-size:10px;margin-top:2px">${data.mzmo}${data.mzp?` · передача: ${data.mzp}`:''}</div></div>` : ''}
+  const basketBtn = `<button onclick="toggleBasketBtn(this,'${cad}')" style="margin-top:8px;width:100%;padding:5px 10px;background:${inBasket?'#ff6f61':'var(--accent)'};color:#1a1a1a;border:none;border-radius:4px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600">${inBasket?'− убрать из подборки':'+ в подборку'}</button>`;
+  // адрес для шапки: из РФ-данных (там он структурный и полный), иначе — из наших
+  const kids = (RFM && RFM.ua2rf[cad]) || [];
+  const rfAddr = kids.length && RFM.rf[kids[0]] ? RFM.rf[kids[0]].ad : '';
+  const head = cardHeadHTML(rfAddr || (data && data.ad) || '',
+    [council ? ruName(council.name) : '', raionOf(cad)].filter(Boolean).join(' · '));
+  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45">
+      ${head}
+      <div style="margin-top:7px"><div style="color:#e8c547;font-weight:600;font-size:11px;letter-spacing:.02em">🇺🇦 УКРАИНСКИЙ КАДАСТР</div>
+      ${uaCardHTML(cad, data, council)}</div>
       ${rfBlockForUa(cad)}
       ${basketBtn}
     </div>`;
@@ -908,44 +943,29 @@ const RF_LAYERS = {
   builds:  { file: 'rf/genichesk_buildings.geojson', layer: null,
              style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 } },
 };
-// Украинская «родительская» карточка для РФ-участка (в рамке) + пометка, если надел был поделён
+// Блок украинского кадастра для РФ-участка
 function uaCardForRf(rfCad) {
   if (!RFM) return '';
   const uaCad = RFM.rf2ua[rfCad];
-  if (!uaCad) return `<div style="margin-top:7px;border-top:1px solid #333;padding-top:6px;color:#8b91a8;font-size:11px">В украинском кадастре этого участка нет</div>`;
+  if (!uaCad) return `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:6px;color:#8b93a5;font-size:10.5px">🇺🇦 В украинском кадастре этого участка нет — новая регистрация Роскадастра</div>`;
   const sib = RFM.ua2rf[uaCad] || [];
   const c = COUNCILS.find(x => x.code === uaCad.slice(0, 10));
   const d = c && c.parcels ? c.parcels.find(p => p.c === uaCad) : null;
-  const line = (k, v) => v ? `<div style="margin-top:1px"><b style="color:#aaa">${k}:</b> ${escapeHtml(String(v))}</div>` : '';
-  return `<div style="margin-top:7px;border-top:1px solid #333;padding-top:6px">
-      <div style="color:#e8c547;font-weight:600;font-size:11px">🇺🇦 Украинский кадастр${sib.length >= 2 ? ` — надел поделён на ${sib.length}` : ''}</div>
-      <div style="margin-top:5px;padding:5px 8px;background:rgba(232,197,71,0.10);border:1px solid #e8c547;border-radius:3px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e8c547;font-weight:600">${escapeHtml(uaCad)}</span>
-          ${copyBtn(uaCad, 'Скопировать кадастр (УКР)')}
-        </div>
-        ${d ? `${d.a != null ? `<div style="color:#ddd;font-size:11px">${d.a} га${c ? ' · ' + escapeHtml(ruName(c.name)) : ''}</div>` : ''}
-        ${line('назнач.', d.ct ? catRu(d.ct) : '')}${line('аренд.', d.r)}${line('собств.', d.o)}
-        ${d.ot ? `<div style="color:${ownColor(d.ot)};font-size:10px;margin-top:3px">${escapeHtml(ruOwn(d.ot))}</div>` : ''}`
-        : `<div style="color:#8b91a8;font-size:10px;margin-top:2px">данные совета не загружены — откройте село</div>`}
-      </div>
-      ${sib.length >= 2 ? `<div style="color:#8b91a8;font-size:10px;margin-top:4px">Роскадастр разделил этот надел; здесь показан один из ${sib.length} участков.</div>` : ''}
+  return `<div style="margin-top:8px;border-top:1px solid #2b3140;padding-top:7px">
+      <div style="color:#e8c547;font-weight:600;font-size:11px;letter-spacing:.02em">🇺🇦 УКРАИНСКИЙ КАДАСТР${sib.length >= 2 ? ` — надел поделён на ${sib.length}` : ''}</div>
+      ${uaCardHTML(uaCad, d, c)}
+      ${sib.length >= 2 ? `<div style="color:#8b93a5;font-size:10.5px;margin-top:4px">Показан 1 из ${sib.length} участков, на которые Роскадастр разделил этот надел.</div>` : ''}
     </div>`;
 }
 function rfPopup(p) {
-  const row = (k, v) => v ? `<div style="margin-top:3px"><span style="color:#8b91a8;font-size:10px">${k}:</span> ${escapeHtml(String(v))}</div>` : '';
-  return `<div style="font-size:12px;max-width:320px;color:#e8e8ea">
-    <div style="color:#ff4d4d;font-weight:600;font-size:11px">🇷🇺 Роскадастр</div>
-    <div style="margin-top:5px;padding:5px 8px;background:rgba(255,77,77,0.12);border:1px solid #ff4d4d;border-radius:3px">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-family:'IBM Plex Mono',monospace;color:#ff8a8a;font-weight:600;font-size:11px">${escapeHtml(p.cad || '')}</span>
-        ${p.cad ? copyBtn(p.cad, 'Скопировать кадастр РФ') : ''}
-      </div>
-      ${p.a != null ? `<div style="color:#ddd;font-size:11px">${p.a} га</div>` : ''}
-      ${row('Адрес', p.ad)}${row('Категория', p.cat)}${row('Использование', p.use)}${row('Назначение', p.n)}
-    </div>
-    ${uaCardForRf(p.cad)}
-    <div style="margin-top:5px;font-size:10px;color:#8b91a8">КПТ 94:21:1010004</div></div>`;
+  const uaCad = RFM ? RFM.rf2ua[p.cad] : null;
+  const c = uaCad ? COUNCILS.find(x => x.code === uaCad.slice(0, 10)) : null;
+  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45">
+      ${cardHeadHTML(p.ad || '', [c ? ruName(c.name) : '', uaCad ? raionOf(uaCad) : ''].filter(Boolean).join(' · '))}
+      <div style="margin-top:7px"><div style="color:#ff6b6b;font-weight:600;font-size:11px;letter-spacing:.02em">🇷🇺 РОСКАДАСТР (РФ)</div>
+      ${rfCardHTML(p.cad, p)}</div>
+      ${uaCardForRf(p.cad)}
+    </div>`;
 }
 function toggleRfLayer(key, on) {
   const L_ = RF_LAYERS[key];
@@ -2311,7 +2331,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v31';
+const BUILD_VERSION = 'v32';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
