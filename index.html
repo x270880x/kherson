@@ -839,6 +839,37 @@ function cardHeadHTML(addr, sub) {
       ${sub ? `<div class="pc-dim" style="font-size:10.5px;margin-top:1px">${escapeHtml(sub)}</div>` : ''}
     </div>`;
 }
+// ── Попап ЗДАНИЯ: сведения о доме + участок, на котором он стоит + соседние дома ──
+function bldPopup(pr) {
+  const cad = pr.cad;
+  const b = (RFM && RFM.b && RFM.b[cad]) || pr || {};
+  const owners = (RFM && RFM.b2p && RFM.b2p[cad]) || [];
+  const rfP = owners.find(o => o.startsWith('94:'));            // участок Роскадастра
+  const uaP = owners.find(o => !o.startsWith('94:')) || (rfP && RFM.rf2ua[rfP]);   // украинский надел
+  const c = uaP ? COUNCILS.find(x => x.code === uaP.slice(0, 10)) : null;
+  const d = c && c.parcels ? c.parcels.find(x => x.c === uaP) : null;
+  // соседние дома на том же участке
+  const sib = ((rfP && RFM.p2b[rfP]) || (uaP && RFM.p2b[uaP]) || []).filter(x => x !== cad);
+  const known = b.m2 != null || b.n;
+  return `<div style="font-size:12px;color:#e2e6ee;max-width:340px;line-height:1.45;display:flex;flex-direction:column;max-height:min(70vh,520px)">
+      <div style="flex:0 0 auto">${cardHeadHTML(b.ad || '', [c ? ruName(c.name) : '', uaP ? raionOf(uaP) : ''].filter(Boolean).join(' · '))}</div>
+      <div class="pop-scroll" style="overflow-y:auto;flex:1 1 auto;min-height:0;padding-right:3px">
+        <div style="margin-top:5px"><div class="pc-h" style="color:#f0c04a">🏠 ЗДАНИЕ</div>
+          <div class="pc pc-bl">
+            ${cadLine(cad, '#f0c04a', 'Скопировать кадастр здания')}
+            ${pcRowHTML('площадь', b.m2 != null ? `<span class="pc-num">${fmtM2(b.m2)}</span>` : '')}
+            ${pcRow('назначение', b.n)}
+            ${pcRow('адрес', b.ad)}
+            ${!known ? `<div class="pc-dim" style="font-size:10px;margin-top:3px">площадь и назначение в этой выгрузке не указаны</div>` : ''}
+          </div>
+        </div>
+        ${uaP ? `<div class="pc-sec"><div class="pc-h" style="color:#e8c547">🇺🇦 УЧАСТОК — УКРАИНСКИЙ КАДАСТР</div>${uaCardHTML(uaP, d, c)}</div>` : ''}
+        ${rfP ? `<div class="pc-sec"><div class="pc-h" style="color:#ff6b6b">🇷🇺 УЧАСТОК — РОСКАДАСТР (РФ)</div>${rfCardHTML(rfP)}</div>` : ''}
+        ${(!uaP && !rfP) ? `<div class="pc-sec pc-dim" style="font-size:10.5px">Участок под этим зданием в данных не определён</div>` : ''}
+        ${sib.length ? `<div class="pc-sec"><div class="pc-h" style="color:#f0c04a">🏠 ДРУГИЕ ЗДАНИЯ НА УЧАСТКЕ — ${sib.length}</div>${sib.map(bldCardHTML).join('')}</div>` : ''}
+      </div>
+    </div>`;
+}
 // Блок Роскадастра для нашего участка
 function rfBlockForUa(cad) {
   if (!RFM) return '';
@@ -1023,7 +1054,8 @@ function toggleRfLayer(key, on) {
   const L_ = RF_LAYERS[key];
   if (on) {
     if (!L_.layer) {
-      L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => rfPopup(f.properties)) });
+      const mk = key === 'builds' ? bldPopup : rfPopup;   // у зданий свой попап (дом + участок под ним)
+      L_.layer = L.geoJSON(null, { style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
       fetch(L_.file).then(r => r.json()).then(d => L_.layer.addData(d)).catch(e => console.warn('RF layer', key, e));
     }
     if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
@@ -2383,7 +2415,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v34';
+const BUILD_VERSION = 'v35';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
