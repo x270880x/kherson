@@ -256,11 +256,17 @@
   #layers-box .lyr-btn { width: 100%; margin-top: 6px; padding: 5px; background: transparent; border: 1px solid #ff4d4d;
                          color: #ff8a8a; border-radius: 4px; font: inherit; font-size: 11px; cursor: pointer; }
   #layers-box .lyr-btn:hover { background: rgba(255,77,77,.12); }
+  /* Формы собственности внутри украинской группы: с отступом, как подпункты слоя «Участки» */
+  #layers-box .lyr-sub { margin: 2px 0 0 20px; padding-top: 2px; border-top: 1px solid var(--border); }
+  #layers-box .lyr-h2 { font-size: 9.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+                        margin: 7px 0 2px; padding-top: 5px; border-top: 1px solid var(--border); }
   /* Карточки объединённого попапа: единая сетка «подпись — значение» */
   .pc { margin-top: 6px; padding: 7px 9px; border-radius: 4px; border: 1px solid; }
   .pc-ua { background: rgba(232,197,71,.08); border-color: #e8c547; }
   .pc-rf { background: rgba(255,77,77,.08); border-color: #ff4d4d; }
   .pc-bl { background: rgba(240,192,74,.07); border-color: #f0c04a; }
+  .pc-bl-go { cursor: pointer; }
+  .pc-bl-go:hover { background: rgba(240,192,74,.16); border-color: #ffe08a; }
   .pc-cad { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
   .pc-cad span { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 600; word-break: break-all; }
   .pc-row { display: grid; grid-template-columns: 92px 1fr; gap: 4px 8px; font-size: 11px; line-height: 1.4; margin-top: 2px; }
@@ -368,10 +374,14 @@
       <div class="lyr-grp">
         <div class="lyr-h"><span class="flag">🇺🇦</span>Украинский кадастр</div>
         <label class="lyr"><input type="checkbox" id="ly-ua" checked><span class="sw" style="background:#4caf7d"></span>Участки<span class="cnt" id="cnt-ua"></span></label>
-        <label class="lyr"><input type="checkbox" id="ly-mz"><span class="sw" style="background:#c050ff"></span>Размежёванные<span class="cnt">2 408</span></label>
+        <!-- Формы собственности — это разбивка украинских участков, поэтому живут внутри украинской группы -->
+        <div id="filter-ownership" class="lyr-sub"></div>
       </div>
       <div class="lyr-grp">
-        <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр — Геническ</div>
+        <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр</div>
+        <!-- Размежевание — это и есть РФ-кадастр, поэтому слой в российской группе -->
+        <label class="lyr"><input type="checkbox" id="ly-mz"><span class="sw" style="background:#c050ff"></span>Размежёванные<span class="cnt">2 408</span></label>
+        <div class="lyr-h2">по Геническу (КПТ 94:21:1010004)</div>
         <label class="lyr"><input type="checkbox" id="ly-rf"><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
         <label class="lyr"><input type="checkbox" id="ly-bld"><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
         <div id="rf-zoom-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0"></div>
@@ -380,12 +390,11 @@
     </div>
 
     <div class="filter-group">
-      <label>Форма собственности</label>
+      <label>Режим карты</label>
       <div id="own-mode">
         <button type="button" data-mode="council" class="on">По сёлам</button>
         <button type="button" data-mode="all">Вся карта</button>
       </div>
-      <div id="filter-ownership" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:8px;font-size:11px"></div>
     </div>
 
     <div class="filter-group">
@@ -833,7 +842,9 @@ function uaCardHTML(uaCad, d, council) {
 function bldCardHTML(cad) {
   const b = (RFM && RFM.b && RFM.b[cad]) || {};
   const known = b.m2 != null || b.n;
-  return `<div class="pc pc-bl">
+  // Дома не перехватывают мышь на карте (см. панель rfBuilds), поэтому вход в карточку дома —
+  // отсюда: клик по строке в списке зданий участка показывает дом на карте.
+  return `<div class="pc pc-bl pc-bl-go" title="Показать это здание на карте" onclick="showBuilding('${escapeHtml(cad)}')">
       ${cadLine(cad, '#f0c04a', 'Скопировать кадастр здания')}
       ${pcRowHTML('площадь', b.m2 != null ? `<span class="pc-num">${fmtM2(b.m2)}</span>` : '')}
       ${pcRow('назначение', b.n)}
@@ -1153,14 +1164,27 @@ function applyRfZoomGate() {
         const mk = key === 'builds' ? bldPopup : rfPopup;
         // СВОЙ canvas на слой: при пересборке Leaflet чистит только изменившуюся область общего
         // холста, и от снятых объектов оставались пиксели — они и выглядели как свечение/пятно.
-        L_.renderer = L.canvas({ padding: 0.2 });
-        L_.layer = L.geoJSON(null, { renderer: L_.renderer, style: L_.style, onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) });
-        L_.layer.on('mouseover', e => {
-          e.layer.setStyle(L_.hover);
-          if (e.layer.bringToFront) e.layer.bringToFront();
-          map.getContainer().style.cursor = 'pointer';
-        });
-        L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
+        // Здания рисуем в СВОЮ панель со СКВОЗНОЙ мышью: холст Leaflet перекрывает всю карту,
+        // и верхний холст забирал наведение целиком — подсвечивались только дома, а до участков
+        // под ними мышь не доходила. Теперь дом виден, но мышь проходит насквозь к участку.
+        // Карточка дома при этом не потеряна: дома перечислены в карточке участка, каждый кликабелен.
+        if (key === 'builds' && !map.getPane('rfBuilds')) {
+          const pn = map.createPane('rfBuilds');
+          pn.style.zIndex = 401;              // выше участков (400) — дома видно поверх
+          pn.style.pointerEvents = 'none';    // но мышь их не замечает
+        }
+        const paneOpt = key === 'builds' ? { pane: 'rfBuilds' } : {};
+        L_.renderer = L.canvas(Object.assign({ padding: 0.2 }, paneOpt));
+        L_.layer = L.geoJSON(null, Object.assign({ renderer: L_.renderer, style: L_.style,
+          onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) }, paneOpt));
+        if (key !== 'builds') {
+          L_.layer.on('mouseover', e => {
+            e.layer.setStyle(L_.hover);
+            if (e.layer.bringToFront) e.layer.bringToFront();
+            map.getContainer().style.cursor = 'pointer';
+          });
+          L_.layer.on('mouseout', e => { L_.layer.resetStyle(e.layer); map.getContainer().style.cursor = ''; });
+        }
       }
       if (!map.hasLayer(L_.layer)) L_.layer.addTo(map);
       if (!L_.data) {
@@ -1228,19 +1252,21 @@ document.getElementById('ly-ua').addEventListener('change', e => applyUaLayer(e.
 document.getElementById('ly-mz').addEventListener('change', e => applyMzLayer(e.target.checked));
 document.getElementById('ly-rf').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
 document.getElementById('ly-bld').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
-// Кнопка «Показать Геническ»: включает всё нужное и переносит вид на квартал
-document.getElementById('rf-goto').addEventListener('click', () => {
-  map.setView([46.1745, 34.8065], 17);   // z17 — с этого зума видны ВСЕ слои, включая здания
+// Центр Геническа со всеми слоями сразу — и кнопкой, и прямой ссылкой `?genichesk=1`
+// (можно добавить `&z=18`; зум по умолчанию 17 — с него видны все четыре слоя, включая здания)
+function showGenichesk(zoom) {
+  map.setView([46.1745, 34.8065], zoom || 17);
   const ua = document.getElementById('ly-ua');
   if (!ua.checked) { ua.checked = true; applyUaLayer(true); }
   loadCouncilPolygons('6522110100');   // укр. участки рисуются только для ОТКРЫТОГО села
   setTimeout(() => {
-    for (const [id, key] of [['ly-rf','parcels'], ['ly-bld','builds']]) {
+    for (const [id, key] of [['ly-rf', 'parcels'], ['ly-bld', 'builds']]) {
       const cb = document.getElementById(id);
       if (!cb.checked) { cb.checked = true; toggleRfLayer(key, true); }
     }
   }, 60);
-});
+}
+document.getElementById('rf-goto').addEventListener('click', () => showGenichesk());
 // ⚠️ ВОССТАНОВЛЕНО 18.08.2026: этот блок был случайно вырезан в v38 («панель слоёв») вместе с
 // объявлениями BB_BY_CODE / LABEL_PTS / OBLAST_BOUNDS / isCenter / clickNP / clearHover /
 // showOwnTable / showRaionTable — при том, что вызовы остались. nearCouncils() падал на
@@ -2484,11 +2510,15 @@ async function gotoRf(key, cad) {
   if (cb && !cb.checked) { cb.checked = true; toggleRfLayer(key, true); }
   loadCouncilPolygons('6522110100');                    // украинский контекст под РФ-объектом
   const bb = featBB(f);
-  map.setView([(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2], key === 'builds' ? 18 : 17);
+  // без анимации: отрисовка тысяч объектов всё равно рвёт зум-анимацию (см. rfSchedule),
+  // а при прерванной анимации Leaflet молча глотает смену зума
+  map.setView([(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2], key === 'builds' ? 18 : 17, { animate: false });
   setTimeout(() => L.popup({ maxWidth: 360 }).setLatLng([(bb[1] + bb[3]) / 2, (bb[0] + bb[2]) / 2])
     .setContent((key === 'builds' ? bldPopup : rfPopup)(f.properties)).openOn(map), 400);
   return true;
 }
+// Показать здание с карточки участка (дома на карте мышь не ловят — см. панель rfBuilds)
+function showBuilding(cad) { gotoRf('builds', cad); }
 function rfSearch(q) {
   const say = html => { sr.innerHTML = html; sr.style.display = 'block'; };
   if (!RFM) { loadRfMatch(); say('<div class="item" style="color:var(--muted)">Индекс Роскадастра ещё загружается — повторите через секунду</div>'); return; }
@@ -2634,7 +2664,12 @@ buildMarkers();
 
 // Старт: ?z=/?zoom= — сразу «Вся карта» на заданном зуме; иначе «По сёлам» с тем же обзором, привязанным к экрану
 const SAVED_MODE = (function () { try { return localStorage.getItem('kherson_mode'); } catch (e) { return null; } })();
-if (isFinite(Z_PARAM) && Z_PARAM > 0) {
+// `?genichesk=1` — прямая ссылка на центр Геническа со всеми слоями (укр. участки + участки и здания РФ).
+// Стоит ПЕРЕД остальными ветками: явная ссылка сильнее и сохранённой плашки, и обзора по умолчанию.
+if (_qs.get('genichesk') === '1') {
+  setOwnMode('council', true);                       // укр. участки рисуются для открытого села
+  showGenichesk(isFinite(Z_PARAM) && Z_PARAM > 0 ? Z_PARAM : 17);
+} else if (isFinite(Z_PARAM) && Z_PARAM > 0) {
   map.setView(OVERVIEW_CENTER, Z_PARAM, { animate: false });   // вид сразу
   setOwnMode('all', true);                                     // затем тайлы — грузятся один раз
 } else if (SAVED_MODE === 'all') {
@@ -2645,7 +2680,7 @@ if (isFinite(Z_PARAM) && Z_PARAM > 0) {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v48';
+const BUILD_VERSION = 'v49';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
