@@ -1139,6 +1139,11 @@ function rfRender(key) {                   // перерисовать слой 
   // getBounds() схлопывается в точку — в кадр не попадает НИЧЕГО, и этот пустой набор потом
   // остаётся на экране навсегда, пока не подвигаешь карту. Поэтому просто ждём следующего кадра.
   if (map.getSize().x < 2 || map.getSize().y < 2) { rfSchedule(); return; }
+  // ⚠️ Пока открыт попап — слой НЕ пересобираем. `clearLayers()` уничтожает объект-источник,
+  // и Leaflet закрывает привязанный к нему попап. Цепочка была такая: клик → попап открылся →
+  // autoPan подвинул карту, чтобы карточка влезла → moveend → через 180 мс пересборка → карточка
+  // исчезала сама, «мигнув». Пересборку откладываем до закрытия попапа (rfDirty).
+  if (rfPopupOpen) { rfDirty = true; return; }
   const b = map.getBounds().pad(0.12);   // небольшой запас, чтобы при панораме не мигало
   const W = b.getWest(), S = b.getSouth(), E = b.getEast(), N = b.getNorth();
   const vis = L_.data.features.filter(f => { const q = featBB(f); return q[2] >= W && q[0] <= E && q[3] >= S && q[1] <= N; });
@@ -1219,6 +1224,9 @@ function applyRfZoomGate() {
 // добавление тысяч объектов синхронно срывает зум-анимацию Leaflet: карта «залипает»
 // на прежнем зуме, а на экране остаётся РАСТЯНУТЫЙ кадр (размытое пятно/свечение).
 // Поэтому откладываем работу до конца кадра.
+let rfPopupOpen = false, rfDirty = false;
+map.on('popupopen', () => { rfPopupOpen = true; });
+map.on('popupclose', () => { rfPopupOpen = false; if (rfDirty) { rfDirty = false; rfSchedule(); } });
 let rfTimer = null;
 function rfSchedule() {
   clearTimeout(rfTimer);
@@ -2700,7 +2708,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v51';
+const BUILD_VERSION = 'v52';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
