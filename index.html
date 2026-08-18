@@ -375,8 +375,8 @@
       <div class="lyr-grp">
         <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр</div>
         <div class="lyr-h2" style="margin-top:0;padding-top:0;border-top:none">по Геническу (КПТ 94:21:1010004)</div>
-        <label class="lyr"><input type="checkbox" id="ly-rf"><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
-        <label class="lyr"><input type="checkbox" id="ly-bld"><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
+        <label class="lyr"><input type="checkbox" id="ly-rf" checked><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
+        <label class="lyr"><input type="checkbox" id="ly-bld" checked><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
         <div id="rf-zoom-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0"></div>
         <!-- Размежевание — по всей области, поэтому под геническими слоями -->
         <div class="lyr-h2">по всей области</div>
@@ -385,7 +385,7 @@
       </div>
       <div class="lyr-grp">
         <div class="lyr-h"><span class="flag">🇺🇦</span>Украинский кадастр</div>
-        <label class="lyr"><input type="checkbox" id="ly-ua" checked><span class="sw" style="background:#4caf7d"></span>Участки<span class="cnt" id="cnt-ua"></span></label>
+        <label class="lyr"><input type="checkbox" id="ly-ua"><span class="sw" style="background:#4caf7d"></span>Участки<span class="cnt" id="cnt-ua"></span></label>
         <!-- Формы собственности — это разбивка украинских участков, поэтому живут внутри украинской группы -->
         <div id="filter-ownership" class="lyr-sub"></div>
       </div>
@@ -605,7 +605,7 @@ window.addEventListener('resize', applyMapLock);                       // под
 
 // Polygon layers cache, keyed by council code
 const polygonLayers = {};        // code → L.geoJSON
-let polygonsVisible = true;
+let polygonsVisible = false;   // со старта украинские участки ВЫКЛЮЧЕНЫ (галочка ly-ua снята)
 
 // Группировка близких маркеров; в пузырьке — сумма участков, разворачиваются при приближении.
 const clusterGroup = L.markerClusterGroup({
@@ -1256,13 +1256,20 @@ document.getElementById('ly-ua').addEventListener('change', e => applyUaLayer(e.
 document.getElementById('ly-mz').addEventListener('change', e => applyMzLayer(e.target.checked));
 document.getElementById('ly-rf').addEventListener('change', e => toggleRfLayer('parcels', e.target.checked));
 document.getElementById('ly-bld').addEventListener('change', e => toggleRfLayer('builds', e.target.checked));
+// Стартовое состояние слоёв берём ПРЯМО ИЗ ГАЛОЧЕК — единственный источник правды, не дублируем
+// умолчания в коде. Сейчас отмечены участки и здания Роскадастра; укр. участки и размежевание сняты.
+// Слои РФ на обзорном зуме всё равно скрыты порогом (z15/z17) и проявятся при приближении.
+for (const [id, apply] of [['ly-ua', applyUaLayer], ['ly-mz', applyMzLayer],
+                           ['ly-rf', on => toggleRfLayer('parcels', on)], ['ly-bld', on => toggleRfLayer('builds', on)]]) {
+  apply(document.getElementById(id).checked);
+}
 // Центр Геническа со всеми слоями сразу — и кнопкой, и прямой ссылкой `?genichesk=1`
 // (можно добавить `&z=18`; зум по умолчанию 17 — с него видны все четыре слоя, включая здания)
 function showGenichesk(zoom) {
   map.setView([46.1745, 34.8065], zoom || 17);
-  const ua = document.getElementById('ly-ua');
-  if (!ua.checked) { ua.checked = true; applyUaLayer(true); }
-  loadCouncilPolygons('6522110100');   // укр. участки рисуются только для ОТКРЫТОГО села
+  // Украинский слой НЕ включаем: со старта он выключен по договорённости. Геометрию совета всё равно
+  // подгружаем — она нужна карточкам и появится сразу, как только пользователь поставит галочку.
+  loadCouncilPolygons('6522110100');
   setTimeout(() => {
     for (const [id, key] of [['ly-rf', 'parcels'], ['ly-bld', 'builds']]) {
       const cb = document.getElementById(id);
@@ -1771,7 +1778,7 @@ function setOwnMode(mode, noFly) {   // noFly: вид уже выставлен 
     if (!noFly) flyOverview(true);   // «По сёлам»: тот же обзор, привязанный к экрану (как у «Вся карта»)
   }
   applyBasemapLabels();   // «Вся карта» → подложка без подписей (как у беты); «По сёлам» → OSM с подписями
-  setMzLayerChecked(ownMode === 'all' ? filterMz !== 'no' : filterMz === 'yes');   // умолчание режима: в «Вся карта» межевание включено, в «По сёлам» — только под фильтр
+  setMzLayerChecked(filterMz === 'yes');   // межевание со старта выключено: включает только явный фильтр или галочка
   setHoverParcel(null); syncBasketOverlay(); syncHiZoomOutlines();   // ободки/контуры — под текущий режим
   applyOwnModeUI();
 }
@@ -2184,7 +2191,7 @@ document.getElementById('filter-category').addEventListener('change', e => {
 });
 document.getElementById('filter-mz').addEventListener('change', e => {
   filterMz = e.target.value;
-  setMzLayerChecked(filterMz === 'yes' || (ownMode === 'all' && filterMz !== 'no'));   // фильтр ставит галочку, снять её пользователь может сам
+  setMzLayerChecked(filterMz === 'yes');   // фильтр ставит галочку, снять её пользователь может сам
   buildMarkers();
   if (activeCode) showDetail(activeCode);
 });
@@ -2401,7 +2408,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
   document.getElementById('filter-renter').value = '';
   document.getElementById('filter-category').value = '';
   document.getElementById('filter-mz').value = '';
-  setMzLayerChecked(ownMode === 'all');   // сброс — к умолчанию режима
+  setMzLayerChecked(false);   // сброс — межевание выключено, как со старта
   document.getElementById('search').value = '';
   document.getElementById('search-results').style.display = 'none';
   if (ownMode === 'all') {   // «Вся карта»: сброс = все формы снова видимы, чекбоксы отмечены, тайлы перерисованы (кружки в этом режиме не нужны)
@@ -2693,7 +2700,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v50';
+const BUILD_VERSION = 'v51';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
