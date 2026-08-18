@@ -371,21 +371,23 @@
 
     <div class="filter-group" id="layers-box">
       <label>Слои</label>
+      <!-- Российский кадастр идёт ПЕРВЫМ — он основной для работы -->
+      <div class="lyr-grp">
+        <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр</div>
+        <div class="lyr-h2" style="margin-top:0;padding-top:0;border-top:none">по Геническу (КПТ 94:21:1010004)</div>
+        <label class="lyr"><input type="checkbox" id="ly-rf"><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
+        <label class="lyr"><input type="checkbox" id="ly-bld"><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
+        <div id="rf-zoom-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0"></div>
+        <!-- Размежевание — по всей области, поэтому под геническими слоями -->
+        <div class="lyr-h2">по всей области</div>
+        <label class="lyr"><input type="checkbox" id="ly-mz"><span class="sw" style="background:#c050ff"></span>Размежёванные<span class="cnt">2 408</span></label>
+        <button id="rf-goto" type="button" class="lyr-btn">📍 Показать Геническ</button>
+      </div>
       <div class="lyr-grp">
         <div class="lyr-h"><span class="flag">🇺🇦</span>Украинский кадастр</div>
         <label class="lyr"><input type="checkbox" id="ly-ua" checked><span class="sw" style="background:#4caf7d"></span>Участки<span class="cnt" id="cnt-ua"></span></label>
         <!-- Формы собственности — это разбивка украинских участков, поэтому живут внутри украинской группы -->
         <div id="filter-ownership" class="lyr-sub"></div>
-      </div>
-      <div class="lyr-grp">
-        <div class="lyr-h"><span class="flag">🇷🇺</span>Роскадастр</div>
-        <!-- Размежевание — это и есть РФ-кадастр, поэтому слой в российской группе -->
-        <label class="lyr"><input type="checkbox" id="ly-mz"><span class="sw" style="background:#c050ff"></span>Размежёванные<span class="cnt">2 408</span></label>
-        <div class="lyr-h2">по Геническу (КПТ 94:21:1010004)</div>
-        <label class="lyr"><input type="checkbox" id="ly-rf"><span class="sw" style="background:#ff4d4d"></span>Участки<span class="cnt">6 796</span></label>
-        <label class="lyr"><input type="checkbox" id="ly-bld"><span class="sw" style="background:#f0c04a"></span>Здания<span class="cnt">17 281</span></label>
-        <div id="rf-zoom-hint" style="display:none;font-size:10px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0"></div>
-        <button id="rf-goto" type="button" class="lyr-btn">📍 Показать Геническ</button>
       </div>
     </div>
 
@@ -740,6 +742,8 @@ function parcelStyle(f, council) {
   const data = idx ? idx.get(cad) : null;   // O(1) вместо линейного .find на каждый участок
   // При активном фильтре подходящие ПОДСВЕЧИВАЕМ (яркая белая обводка), остальные ГАСИМ — но не прячем,
   // чтобы был виден контекст квартала (раньше не подходящие исчезали совсем)
+  // Снятая галка формы собственности = слой выключен: участок не рисуется совсем
+  if (data && !filterOwnership.has(data.ot)) return { stroke: false, fill: false };
   const filtering = hasAnyFilter();
   const match = !filtering || (data && parcelMatchesFilters(data, council ? council.region : ''));
   let fill = data ? ownColor(data.ot) : '#3a3f55';
@@ -1664,9 +1668,15 @@ function parcelMatchesFilters(p, councilRegion) {
   return true;
 }
 
+// ⚠️ Формы собственности — это СЛОИ (галочки в панели слоёв), а не фильтр: снятая галка ПРЯЧЕТ
+// форму с карты (см. parcelStyle), поэтому в hasAnyFilter она не участвует — иначе снятие одной
+// формы включало бы режим подсветки и обводило белым все оставшиеся участки.
 function hasAnyFilter() {
-  return !!(filterRenter || filterOwnership.size > 0 || filterCategory || filterRegion || filterLeaseYear || filterMz);
+  return !!(filterRenter || filterCategory || filterRegion || filterLeaseYear || filterMz);
 }
+// Сужение выборки для подсчётов (сюда формы входят — счётчики в правой панели должны их учитывать)
+function ownNarrowed() { return filterOwnership.size < (FILTERS.ownership || []).length; }
+function hasAnyNarrowing() { return hasAnyFilter() || ownNarrowed(); }
 
 
 // число размежёванных (РФ кадастр) участков по коду совета — для агрегатного подсчёта filterMz
@@ -1674,7 +1684,7 @@ const MZ_COUNT={"6522186500":4,"6522381000":25,"6522310100":6,"6521555100":20,"6
 
 // v2: используем агрегаты, если parcels не загружены
 function getFilteredStats(council) {
-  if (!hasAnyFilter()) return { count: council.total, area: council.area };
+  if (!hasAnyNarrowing()) return { count: council.total, area: council.area };
   // If parcels already loaded, compute exactly
   if (council.parcels) {
     let n = 0, a = 0;
@@ -1741,7 +1751,7 @@ function setOwnMode(mode, noFly) {   // noFly: вид уже выставлен 
   if (mode === ownMode) return;
   ownMode = mode;
   try { localStorage.setItem('kherson_mode', mode); } catch (e) {}   // запомнить плашку — восстановим при следующем заходе
-  filterOwnership = new Set();
+  filterOwnership = new Set(FILTERS.ownership || []);   // формы видимы в обоих режимах
   if (mode === 'all') {
     allMapVisible.clear(); ['p','k','g','n'].forEach(s => allMapVisible.add(s));   // со старта все формы (вкл. частную)
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = true);
@@ -1753,7 +1763,7 @@ function setOwnMode(mode, noFly) {   // noFly: вид уже выставлен 
     syncParcelTiles();    // тайлы добавляем ПОСЛЕ установки вида → грузятся один раз для нужного зума
     labelsUpdate();
   } else {
-    document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = true);
     syncParcelTiles();       // убрать тайлы
     labelsClear();           // снять подписи
     if (!map.hasLayer(clusterGroup)) clusterGroup.addTo(map);   // вернуть кружки-маркеры
@@ -2110,12 +2120,13 @@ function renderSidebar() {
   const ownOrdered = [...FILTERS.ownership].sort((a,b) => (a === 'Не визначено' ? 1 : 0) - (b === 'Не визначено' ? 1 : 0));
   fo.innerHTML = ownOrdered.map((r,i)=>`
     <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;line-height:1.3;font-size:12px;text-transform:none;letter-spacing:0;font-weight:400;margin:0">
-      <input type="checkbox" value="${escapeHtml(r)}" data-ownership style="margin:0;flex-shrink:0;width:13px;height:13px;accent-color:${ownColor(r)}"/>
+      <input type="checkbox" value="${escapeHtml(r)}" data-ownership checked style="margin:0;flex-shrink:0;width:13px;height:13px;accent-color:${ownColor(r)}"/>
       <span style="width:10px;height:10px;border-radius:2px;background:${ownColor(r)};flex-shrink:0"></span>
       <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${ownColor(r)}">${escapeHtml(ruOwn(r).replace(' собственность',''))}</span>
       <span style="font-family:'IBM Plex Mono',monospace;color:var(--muted);font-size:11px;flex-shrink:0">${fmt(STATS.ownership_split[r] || 0)}</span>
     </label>
   `).join('');
+  filterOwnership = new Set(ownOrdered);   // со старта видны все формы (галочки отмечены)
   fo.querySelectorAll('input[data-ownership]').forEach(cb => {
     cb.addEventListener('change', () => {
       if (ownMode === 'all') {        // режим «вся карта»: галка = добавить/убрать слой одной формы (остальные не трогаются)
@@ -2127,6 +2138,7 @@ function renderSidebar() {
       filterOwnership = new Set(
         Array.from(fo.querySelectorAll('input[data-ownership]:checked')).map(x => x.value)
       );
+      restyleFilteredPolygons();   // снятая форма исчезает с карты прямо сейчас
       buildMarkers();
       if (activeCode) showDetail(activeCode);
     });
@@ -2385,7 +2397,7 @@ document.getElementById('btn-basket-export-csv').addEventListener('click', e => 
 
 document.getElementById('btn-reset').addEventListener('click', () => {
   filterRenter = filterCategory = filterRegion = filterLeaseYear = filterMz = '';
-  filterOwnership = new Set();
+  filterOwnership = new Set(FILTERS.ownership || []);
   document.getElementById('filter-renter').value = '';
   document.getElementById('filter-category').value = '';
   document.getElementById('filter-mz').value = '';
@@ -2397,7 +2409,8 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = true);
     syncParcelTiles();
   } else {
-    document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('#filter-ownership input[data-ownership]').forEach(cb => cb.checked = true);
+    restyleFilteredPolygons();
     buildMarkers();
     if (activeCode) showDetail(activeCode);
   }
@@ -2680,7 +2693,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v49';
+const BUILD_VERSION = 'v50';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
