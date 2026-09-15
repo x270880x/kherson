@@ -1027,7 +1027,7 @@ const parcelLayers = {};            // «Вся карта»: по слою на
 const TILE_OWN_COLOR = { p: '#2ecc71', k: '#e8c547', g: '#4a9eff', n: '#ff6f61' };  // = ownColor
 const OT_SHORT = { 'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n' };
 const allMapVisible = new Set(['p','k','g','n']);   // формы, видимые в режиме «Вся карта» (по умолчанию все, вкл. частную)
-const TILE_VG_OPTS = { rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 19, maxNativeZoom: 14 };
+const TILE_VG_OPTS = { rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 21, maxNativeZoom: 14 };   // maxZoom держать равным maxZoom карты, иначе участки пропадают на сильном приближении
 function fillOp() {   // яркость заливки по зуму: z≤9 → 0.80, z10 → 0.65, z11+ → 0.50 (обновляется при отрисовке тайлов на смене зума)
   const z = map.getZoom();
   if (z <= 9) return 0.80;
@@ -2730,7 +2730,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v53';
+const BUILD_VERSION = 'v54';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
