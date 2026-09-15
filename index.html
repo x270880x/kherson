@@ -581,7 +581,7 @@ function detailTitle(c) {
 })();
 
 // Init map
-const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 19, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
+const map = L.map('map', { zoomControl: true, attributionControl: false, maxZoom: 21, preferCanvas: true, zoomSnap: 0 }).setView([46.88, 34.40], 10);
 const _qs = new URLSearchParams(location.search);
 const Z_PARAM = parseFloat(_qs.get('z') || _qs.get('zoom'));   // ?z=8.5 или ?zoom=8.5 — зум; при наличии сразу открываем «Вся карта»
 const OVERVIEW_CENTER = L.latLng(46.6895, 33.5461);   // село Роздольне (Раздольное) — центр карты (у центра области)
@@ -944,17 +944,39 @@ function buildParcelPopup(cad, data, council) {
 }
 
 // Базовые слои.  OSM (со своими подписями) — обычный режим; CARTO *nolabels* — в режиме подписей НП «Вся карта» (как на бете)
-const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+// ⚠️ tile.openstreetmap.org отдаёт нам 403 «Access blocked» (нарушение их tile usage policy) —
+// схемы берём с рендера OSM France: данные те же, сервер не блокирует.
+const OSM_URL = 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png';
 const CARTO_DARK_NL = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
 const CARTO_LIGHT_NL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png';
-const baseDark = L.tileLayer(OSM_URL, {
-  maxZoom: 19, attribution: '© OpenStreetMap', className: 'map-tiles map-tiles-dark',
+const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+// Обзорные зумы (z9–13) лежат в самом репозитории, в basemap/ (в tiles/ — векторные тайлы участков) — на общем виде области карта не зависит
+// от чужих серверов. Детальные зумы качать нельзя: на всю область это 3,1 млн плиток / ~45 ГБ,
+// поэтому там работает удалённый источник (подставляется обработчиком tileerror).
+function localTiles(localUrl, remoteUrl, opts) {
+  const layer = L.tileLayer(localUrl, opts);
+  layer.on('tileerror', function (e) {
+    const t = e.tile, c = e.coords;
+    if (!t || t.dataset.fallback) return;
+    t.dataset.fallback = '1';
+    t.src = remoteUrl
+      .replace('{s}', 'abc'[Math.abs(c.x + c.y) % 3])
+      .replace('{z}', c.z).replace('{x}', c.x).replace('{y}', c.y);
+  });
+  return layer;
+}
+// maxNativeZoom — выше этого зума плиток не существует (Esri по всей Херсонской обл. заканчивается
+// на z18 и отдаёт серую «Map data not yet available»); Leaflet растянет последний реальный тайл.
+const baseDark = localTiles('basemap/osm/{z}/{x}/{y}.png', OSM_URL, {
+  maxNativeZoom: 19, maxZoom: 21, attribution: '© OpenStreetMap / OSM France',
+  className: 'map-tiles map-tiles-dark',
 });
-const baseLight = L.tileLayer(OSM_URL, {
-  maxZoom: 19, attribution: '© OpenStreetMap',
+const baseLight = localTiles('basemap/osm/{z}/{x}/{y}.png', OSM_URL, {
+  maxNativeZoom: 19, maxZoom: 21, attribution: '© OpenStreetMap / OSM France',
 });
-const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19, attribution: '© Esri Imagery',
+const baseSat = localTiles('basemap/sat/{z}/{x}/{y}.jpg', SAT_URL, {
+  maxNativeZoom: 18, maxZoom: 21, attribution: '© Esri, Maxar, Earthstar Geographics',
 });
 baseDark.addTo(map);
 
@@ -2708,7 +2730,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v52';
+const BUILD_VERSION = 'v53';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
