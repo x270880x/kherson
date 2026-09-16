@@ -943,12 +943,17 @@ function buildParcelPopup(cad, data, council) {
     </div>`;
 }
 
-// Базовые слои.  OSM (со своими подписями) — обычный режим; CARTO *nolabels* — в режиме подписей НП «Вся карта» (как на бете)
+// Базовые слои.  OSM (со своими подписями) — обычный режим; Esri Canvas (без подписей) — в режиме подписей НП «Вся карта» (как на бете)
 // ⚠️ tile.openstreetmap.org отдаёт нам 403 «Access blocked» (нарушение их tile usage policy) —
 // схемы берём с рендера OSM France: данные те же, сервер не блокирует.
 const OSM_URL = 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png';
-const CARTO_DARK_NL = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
-const CARTO_LIGHT_NL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png';
+// ⚠️ CARTO (basemaps.cartocdn.com) с сентября 2026 штампует «API KEY REQUIRED» поперёк КАЖДОГО
+// тайла — проверены все три адреса, включая легаси cartodb-basemaps-*.global.ssl.fastly.net:
+// отдают байт в байт одну и ту же картинку с водяным знаком. Бесплатного доступа без ключа больше нет.
+// Замена — Esri Canvas (тот же сервер, что и у спутника, ключ не нужен): до z14 подписей нет вовсе,
+// с z15 появляются названия улиц — но НЕ названия НП, а дубли именно их мы и убирали.
+const ESRI_DARK_NL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const ESRI_LIGHT_NL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
 // Обзорные зумы (z9–13) лежат в самом репозитории, в basemap/ (в tiles/ — векторные тайлы участков) — на общем виде области карта не зависит
@@ -956,9 +961,11 @@ const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imag
 // поэтому там работает удалённый источник (подставляется обработчиком tileerror).
 function localTiles(localUrl, remoteUrl, opts) {
   const layer = L.tileLayer(localUrl, opts);
+  layer._localUrl = localUrl;                 // чтобы вернуться к кэшу после подмены источника
   layer.on('tileerror', function (e) {
     const t = e.tile, c = e.coords;
     if (!t || t.dataset.fallback) return;
+    if (layer._url !== layer._localUrl) return;   // источник и так удалённый — подменять не на что
     t.dataset.fallback = '1';
     t.src = remoteUrl
       .replace('{s}', 'abc'[Math.abs(c.x + c.y) % 3])
@@ -980,18 +987,34 @@ const baseSat = localTiles('basemap/sat/{z}/{x}/{y}.jpg', SAT_URL, {
 });
 baseDark.addTo(map);
 
-// Dark filter только для baseDark (OSM); в режиме подписей подложка — CARTO nolabels, инверт выключаем
+// Dark filter только для baseDark (OSM); в режиме подписей подложка — Esri Dark Gray, она уже тёмная, инверт выключаем
 const style = document.createElement('style');
 style.textContent = '.map-tiles-dark { filter: invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.7); }'
   + ' #map.labels-basemap .map-tiles-dark { filter: none !important; }';
 document.head.appendChild(style);
 // В «Вся карта» (labelsActive) подложка без подписей — наши подписи НП не дублируются OSM-подписями; в «По сёлам» возвращаем OSM (контекст соседних городов/рек)
+// Локальный кэш basemap/ покрывает только z6–13 (см. basemap/README.md). Выше сразу берём удалённый
+// источник: иначе на КАЖДЫЙ тайл уходит 404 к нам и только потом запрос наружу — двойная работа и
+// полная консоль ошибок. Подстраховка localTiles() остаётся на дырки внутри z6–13.
+const LOCAL_MAX_Z = 13;
+function baseUrlFor(layer, remote) { return Math.round(map.getZoom()) <= LOCAL_MAX_Z ? layer._localUrl : remote; }
+function setBasemap(layer, url, maxNative) {
+  layer.options.maxNativeZoom = maxNative;    // у Esri Canvas тайлы кончаются на z16 — выше Leaflet растянет
+  if (layer._url !== url) layer.setUrl(url);
+}
 function applyBasemapLabels() {
-  const noLabels = labelsActive();
-  baseDark.setUrl(noLabels ? CARTO_DARK_NL : OSM_URL);
-  baseLight.setUrl(noLabels ? CARTO_LIGHT_NL : OSM_URL);
+  // Esri Canvas заканчивается на z16: выше Leaflet растягивает последний тайл, и подложка мылится.
+  // С z17 возвращаемся к OSM — там наши пилюли НП и так редкие, дублей названий НП не будет.
+  const noLabels = labelsActive() && map.getZoom() <= 16;
+  // ⚠️ Возвращаем именно ЛОКАЛЬНЫЙ адрес, а не OSM_URL: раньше здесь подставлялся удалённый,
+  // и кэш basemap/ (z6–13, 3 620 плиток) переставал использоваться сразу после старта — setOwnMode
+  // зовёт эту функцию при загрузке. Удалённый источник подставит сам localTiles(), если плитки нет.
+  setBasemap(baseDark, noLabels ? ESRI_DARK_NL : baseUrlFor(baseDark, OSM_URL), noLabels ? 16 : 19);
+  setBasemap(baseLight, noLabels ? ESRI_LIGHT_NL : baseUrlFor(baseLight, OSM_URL), noLabels ? 16 : 19);
+  setBasemap(baseSat, baseUrlFor(baseSat, SAT_URL), 18);
   map.getContainer().classList.toggle('labels-basemap', noLabels);
 }
+map.on('zoomend', applyBasemapLabels);   // порог z16 — подложку надо пересматривать на каждом зуме
 
 const fullMapLayer = L.layerGroup();   // фиктивный слой-тумблер режима «Полная карта»
 const layersCtrl = L.control.layers({
@@ -2730,7 +2753,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v54';
+const BUILD_VERSION = 'v55';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
