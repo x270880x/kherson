@@ -683,17 +683,17 @@ async function loadCouncilPolygons(code, additive = false) {
       style: f => parcelStyle(f, council),
       // Лёгкий проход: только подсветка участков из подборки. Попапы/события — делегированы на слой (ниже).
       onEachFeature: (f, l) => {
-        if (basket.has(f.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
+        if (basket.has(f.properties.cadnum)) l.setStyle(basketStyle());
       }
     });
     // Делегирование на весь слой вместо обработчиков на каждом из тысяч участков
     layer.on('mouseover', e => {
       const l = e.layer;
-      if (!basket.has(l.feature.properties.cadnum)) l.setStyle({ weight: 2, color: '#fff' });
+      if (!basket.has(l.feature.properties.cadnum)) l.setStyle({ weight: 2.4, color: OT().hover, opacity: 1 });
     });
     layer.on('mouseout', e => {
       const l = e.layer;
-      if (basket.has(l.feature.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
+      if (basket.has(l.feature.properties.cadnum)) l.setStyle(basketStyle());
       else layer.resetStyle(l);
     });
     layer.on('click', e => {
@@ -748,16 +748,16 @@ function parcelStyle(f, council) {
   const match = !filtering || (data && parcelMatchesFilters(data, council ? council.region : ''));
   let fill = data ? ownColor(data.ot) : '#3a3f55';
   if (filtering && !match) {
-    return { stroke: true, fill: true, fillColor: fill, color: '#2a2f3a', weight: 0.4, fillOpacity: 0.07, opacity: 0.35 };
+    return { stroke: true, fill: true, fillColor: fill, color: OT().dim, weight: 0.4, fillOpacity: 0.07, opacity: 0.35 };
   }
   if (filtering && match) {   // найденное — яркая обводка поверх обычной заливки
-    return { stroke: true, fill: true, fillColor: fill, color: '#ffffff', weight: 2, fillOpacity: 0.75, opacity: 1 };
+    return { stroke: true, fill: true, fillColor: fill, color: OT().match, weight: 2, fillOpacity: 0.75, opacity: 1 };
   }
   // Межевание сделано → толстая фиолетовая обводка
   if (data && data.mz) {
-    return { stroke: true, fill: true, fillColor: fill, color: '#c050ff', weight: 2.5, fillOpacity: 0.6 };
+    return { stroke: true, fill: true, fillColor: fill, color: OT().mz, weight: 2.5, fillOpacity: 0.6 };
   }
-  return { stroke: true, fill: true, fillColor: fill, color: '#1a1a1a', weight: 0.6, fillOpacity: 0.5 };
+  return { stroke: true, fill: true, fillColor: fill, color: OT().seam, weight: 0.6 * OT().seamW, opacity: OT().seamOp, fillOpacity: 0.5 };
 }
 
 // Перерисовать полигоны загруженных сёл под текущий фильтр (скрыть неподходящие)
@@ -766,7 +766,7 @@ function restyleFilteredPolygons() {
     const layer = polygonLayers[code];
     const council = COUNCILS.find(c => c.code === code);
     layer.eachLayer(l => {
-      if (basket.has(l.feature.properties.cadnum)) l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7, stroke:true, fill:true });
+      if (basket.has(l.feature.properties.cadnum)) l.setStyle(basketStyle());
       else l.setStyle(parcelStyle(l.feature, council));
     });
   }
@@ -987,6 +987,24 @@ const baseSat = localTiles('basemap/sat/{z}/{x}/{y}.jpg', SAT_URL, {
 });
 baseDark.addTo(map);
 
+// ── Палитра контуров под подложку ──
+// Контуры раньше были зашиты одним почти чёрным цветом: на тёмной и светлой схеме швы между яркими
+// заливками читались, а на СПУТНИКЕ тонули в крышах и деревьях — соседние участки одного цвета
+// склеивались, пунктир РФ пропадал. Белая подсветка и жёлтая подборка не читались на светлой схеме.
+// Правило: шов контрастен подложке, выделение (наведение/подборка/найденное) контрастно и подложке,
+// и шву — иначе выделенный участок не отличить от соседа.
+const OUTLINE_THEMES = {
+  dark:  { seam: '#0c0c0c', seamOp: 0.85, seamW: 1,   dim: '#2a2f3a', match: '#ffffff', hover: '#ffffff',
+           basket: '#ffff00', rf: '#ff4d4d', rfBoost: 0,    bld: '#f0c04a', mz: '#c050ff' },
+  light: { seam: '#1a1a1a', seamOp: 0.85, seamW: 1,   dim: '#9aa0aa', match: '#000000', hover: '#000000',
+           basket: '#ff7a00', rf: '#d8002a', rfBoost: 0.1,  bld: '#b07d00', mz: '#8a2be2' },
+  sat:   { seam: '#ffffff', seamOp: 0.8,  seamW: 1.4, dim: '#ffffff', match: '#ffff00', hover: '#00e5ff',
+           basket: '#ffff00', rf: '#ff2d2d', rfBoost: 0.35, bld: '#ffd24a', mz: '#ff7bff' },
+};
+let baseKind = 'dark';                       // какая подложка сейчас включена: dark | light | sat
+const OT = () => OUTLINE_THEMES[baseKind];
+const basketStyle = () => ({ color: OT().basket, weight: 3, fillOpacity: 0.7, stroke: true, fill: true });
+
 // Dark filter только для baseDark (OSM); в режиме подписей подложка — Esri Dark Gray, она уже тёмная, инверт выключаем
 const style = document.createElement('style');
 style.textContent = '.map-tiles-dark { filter: invert(0.92) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.7); }'
@@ -1015,6 +1033,30 @@ function applyBasemapLabels() {
   map.getContainer().classList.toggle('labels-basemap', noLabels);
 }
 map.on('zoomend', applyBasemapLabels);   // порог z16 — подложку надо пересматривать на каждом зуме
+
+// Смена подложки (шестерёнка вверху справа) → перекрасить ВСЁ, что уже нарисовано. Новые объекты
+// берут цвета из палитры сами (все стили читают OT() в момент отрисовки), а лежащие на карте — нет.
+function applyOutlineTheme() {
+  restyleFilteredPolygons();                                              // укр. участки «По сёлам»
+  // Тайлы «Вся карта» перерисовываем СНЯТИЕМ И ДОБАВЛЕНИЕМ слоя, а не redraw(): в Leaflet 1.9 GridLayer.redraw()
+  // берёт зум карты БЕЗ округления, а у нас zoomSnap:0 — тайлы запрашивались как tiles/13.5/x/y.pbf (404),
+  // и заливка участков пропадала целиком. onAdd проходит через _setView, где зум округляется правильно.
+  const reAdd = l => { if (l && map.hasLayer(l)) { map.removeLayer(l); map.addLayer(l); } };
+  reAdd(parcelTilesAll);
+  for (const f in parcelLayers) reAdd(parcelLayers[f]);
+  if (hiOutlineLayer) hiOutlineLayer.resetStyle();                        // чёткие контуры поверх тайлов
+  if (hoverParcelLayer) hoverParcelLayer.setStyle({ color: OT().hover });
+  basketOverlay.eachLayer(l => l.resetStyle && l.resetStyle());           // подборка в тайловом режиме
+  if (razmezhLayer) razmezhLayer.setStyle(razmezhStyle);
+  for (const key of ['parcels', 'builds']) {                              // Роскадастр
+    const L_ = RF_LAYERS[key];
+    if (L_.layer) { L_.layer.setStyle(L_.style); L_.styleSig = JSON.stringify(L_.style()); }
+  }
+}
+map.on('baselayerchange', e => {
+  baseKind = e.layer === baseSat ? 'sat' : e.layer === baseLight ? 'light' : 'dark';
+  applyOutlineTheme();
+});
 
 const fullMapLayer = L.layerGroup();   // фиктивный слой-тумблер режима «Полная карта»
 const layersCtrl = L.control.layers({
@@ -1050,7 +1092,10 @@ const parcelLayers = {};            // «Вся карта»: по слою на
 const TILE_OWN_COLOR = { p: '#2ecc71', k: '#e8c547', g: '#4a9eff', n: '#ff6f61' };  // = ownColor
 const OT_SHORT = { 'Приватна власність':'p','Комунальна власність':'k','Державна власність':'g','Не визначено':'n' };
 const allMapVisible = new Set(['p','k','g','n']);   // формы, видимые в режиме «Вся карта» (по умолчанию все, вкл. частную)
-const TILE_VG_OPTS = { rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 21, maxNativeZoom: 14 };   // maxZoom держать равным maxZoom карты, иначе участки пропадают на сильном приближении
+// ⚠️ zIndex: 10 — участки ВЫШЕ любой подложки. Тайлы участков живут в той же tilePane, что и подложки,
+// а контрол слоёв сам раздаёт подложкам z-index по порядку: тёмная 1, светлая 2, спутник 3. У участков был 1,
+// поэтому на светлой схеме и спутнике подложка ложилась ПОВЕРХ заливки — в «Вся карта» участки пропадали.
+const TILE_VG_OPTS = { zIndex: 10, rendererFactory: L.canvas.tile, interactive: false, minZoom: 8, maxZoom: 21, maxNativeZoom: 14 };   // maxZoom держать равным maxZoom карты, иначе участки пропадают на сильном приближении
 function fillOp() {   // яркость заливки по зуму: z≤9 → 0.80, z10 → 0.65, z11+ → 0.50 (обновляется при отрисовке тайлов на смене зума)
   const z = map.getZoom();
   if (z <= 9) return 0.80;
@@ -1059,7 +1104,7 @@ function fillOp() {   // яркость заливки по зуму: z≤9 → 
 }
 function tileStyle(props, only) {   // only=undefined → красить все формы; only='p' → только эту форму
   if (only && props.o !== only) return [];
-  return { weight: 0.35, color: '#1a1a1a', opacity: 0.85, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: fillOp() };
+  return { weight: 0.35 * OT().seamW, color: OT().seam, opacity: OT().seamOp, fill: true, fillColor: TILE_OWN_COLOR[props.o] || '#888', fillOpacity: fillOp() };
 }
 function ensureFormLayer(form) {    // слой одной формы (для «Вся карта»)
   return parcelLayers[form] || (parcelLayers[form] = L.vectorGrid.protobuf('tiles/{z}/{x}/{y}.pbf',
@@ -1088,7 +1133,7 @@ function syncParcelTiles() {
 function razmezhStyle() {
   const z = map.getZoom();
   const fo = z <= 10 ? 0.16 : z >= 13 ? 0 : 0.16 * (13 - z) / 3;
-  return { color: '#c050ff', weight: z >= 13 ? 1.8 : 1.2, fillColor: '#c050ff', fillOpacity: fo, fill: fo > 0 };
+  return { color: OT().mz, weight: z >= 13 ? 1.8 : 1.2, fillColor: OT().mz, fillOpacity: fo, fill: fo > 0 };
 }
 // Слой РФ-межевания (как в бете): фильтр «Размежёванные» подсвечивает размежёванные участки фиолетовым — на любом зуме и в любом режиме
 let razmezhLayer = null;
@@ -1120,16 +1165,18 @@ const RF_LAYERS = {
              style: () => {
                const z = map.getZoom();
                const t = Math.max(0, Math.min(1, (z - 15) / 2.5));   // 15 → 17.5, плавно
-               return { color: '#ff4d4d',
-                        weight: 0.4 + 0.6 * t,
-                        opacity: 0.28 + 0.67 * t,
+               const th = OT();
+               return { color: th.rf,
+                        weight: 0.4 + 0.6 * t + th.rfBoost * 1.5,           // на спутнике толще —
+                        opacity: Math.min(1, 0.28 + 0.67 * t + th.rfBoost), // иначе тонет в снимке
                         dashArray: z >= 16.5 ? '4,3' : null,
-                        fill: z >= 17, fillColor: '#ff4d4d', fillOpacity: 0.05 };
+                        fill: z >= 17, fillColor: th.rf, fillOpacity: 0.05 };
              },
-             hover: { color: '#ffffff', weight: 2.6, dashArray: null, opacity: 1, fill: true, fillColor: '#ff4d4d', fillOpacity: 0.30 } },
+             // геттеры, а не литералы: цвет берётся из палитры ТЕКУЩЕЙ подложки в момент наведения
+             get hover() { const th = OT(); return { color: th.hover, weight: 2.6, dashArray: null, opacity: 1, fill: true, fillColor: th.rf, fillOpacity: 0.30 }; } },
   builds:  { file: 'rf/genichesk_buildings.geojson', layer: null,
-             style: { color: '#f0c04a', weight: 0.7, fillColor: '#f0c04a', fillOpacity: 0.28 },
-             hover: { color: '#ffffff', weight: 2.2, fillColor: '#ffe08a', fillOpacity: 0.62 } },
+             style: () => { const th = OT(); return { color: th.bld, weight: baseKind === 'sat' ? 1 : 0.7, fillColor: th.bld, fillOpacity: 0.28 }; },
+             get hover() { const th = OT(); return { color: th.hover, weight: 2.2, fillColor: th.bld, fillOpacity: 0.62 }; } },
 };
 // Блок украинского кадастра для РФ-участка
 function uaCardForRf(rfCad) {
@@ -1592,7 +1639,7 @@ function setHoverParcel(hit) {
   if (cad === hoverParcelCad) return;                  // тот же участок — не перерисовываем
   hoverParcelCad = cad;
   if (hoverParcelLayer) { map.removeLayer(hoverParcelLayer); hoverParcelLayer = null; }
-  if (hit) hoverParcelLayer = L.geoJSON(hit.feature, { interactive: false, style: { color: '#fff', weight: 2, fill: false } }).addTo(map);
+  if (hit) hoverParcelLayer = L.geoJSON(hit.feature, { interactive: false, style: { color: OT().hover, weight: 2.4, fill: false } }).addTo(map);
   map.getContainer().style.cursor = hit ? 'pointer' : '';
 }
 let _hoverQueued = false, _hoverLL = null;
@@ -1628,7 +1675,7 @@ function syncBasketOverlay() {
       feats.forEach(f => {
         const cad = f.properties.cadnum;
         if (want.has(cad) && basket.has(cad) && !basketOverlayByCad[cad]) {
-          const lyr = L.geoJSON(f, { interactive: false, style: { color: '#ff0', weight: 3, fill: true, fillColor: '#ff0', fillOpacity: 0.35 } });
+          const lyr = L.geoJSON(f, { interactive: false, style: () => ({ color: OT().basket, weight: 3, fill: true, fillColor: OT().basket, fillOpacity: 0.35 }) });
           basketOverlayByCad[cad] = lyr; lyr.addTo(basketOverlay);
         }
       });
@@ -1658,7 +1705,7 @@ function syncHiZoomOutlines() {
   }
   clearHiOutlines();
   if (feats.length) hiOutlineLayer = L.geoJSON({ type: 'FeatureCollection', features: feats },
-    { interactive: false, style: { color: '#0c0c0c', weight: 0.9, fill: false } }).addTo(map);
+    { interactive: false, style: () => ({ color: OT().seam, weight: 0.9 * OT().seamW, opacity: OT().seamOp, fill: false }) }).addTo(map);
 }
 function enableFullMap() {
   fullMapMode = true;
@@ -2312,7 +2359,7 @@ function basketUpdate() {
     const council = COUNCILS.find(c => c.code === code);
     layer.eachLayer(l => {
       if (basket.has(l.feature.properties.cadnum)) {
-        l.setStyle({ color:'#ff0', weight:3, fillOpacity:0.7 });
+        l.setStyle(basketStyle());
       } else {
         layer.resetStyle(l);
       }
@@ -2558,7 +2605,7 @@ async function navigateToParcel(cadnum) {
     setTimeout(() => target.openPopup(), 600);
     sr.innerHTML = ''; sr.style.display = 'none';   // нашли — убираем список, иначе висел прошлый ответ поиска
     // Briefly highlight
-    target.setStyle({ weight: 3, color: '#ff0' });
+    target.setStyle({ weight: 3, color: OT().basket });
     setTimeout(() => layer.resetStyle(target), 3000);
   } else {
     sr.innerHTML = `<div class="item" style="color:var(--muted)">Кадастр ${cadnum} нет в полигонах</div>`;
@@ -2753,7 +2800,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v55';
+const BUILD_VERSION = 'v56';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
