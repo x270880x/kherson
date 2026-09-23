@@ -659,13 +659,13 @@ function showOnlyPolygons(code) {
     if (c !== code && map.hasLayer(polygonLayers[c])) map.removeLayer(polygonLayers[c]);
   }
   const cur = polygonLayers[code];
-  if (cur && !map.hasLayer(cur)) cur.addTo(map);
+  if (cur && !map.hasLayer(cur)) { cur.addTo(map); rfParcelsToFront(); }
   activePolyCode = code;
 }
 function addPolygonsAdditive(code) {          // ПК Shift+клик: добавить слой, НЕ убирая ранее открытые
   if (!polygonsVisible) return;
   const cur = polygonLayers[code];
-  if (cur && !map.hasLayer(cur)) cur.addTo(map);
+  if (cur && !map.hasLayer(cur)) { cur.addTo(map); rfParcelsToFront(); }
 }
 
 async function loadCouncilPolygons(code, additive = false) {
@@ -1243,11 +1243,18 @@ function rfRender(key) {                   // перерисовать слой 
   if (L_.shown === vis.length && L_.key === box) return;
   L_.shown = vis.length; L_.key = box;
   L_.layer.clearLayers();
-  if (L_.renderer && L_.renderer._ctx && L_.renderer._container) {   // полностью гасим холст слоя, без остаточных пикселей
-    const c = L_.renderer._container, x = L_.renderer._ctx;
-    x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height); x.restore();
-  }
   L_.layer.addData({ type: 'FeatureCollection', features: vis });
+  // Остаточные пиксели («свечение», v42) лечим ПОЛНОЙ перерисовкой холста: clearLayers/addData уже
+  // запланировали перерисовку на следующий кадр, а сброс границ делает её полной — весь холст
+  // очищается и рисуется заново. Ручной clearRect здесь нельзя: холст участков РФ теперь общий
+  // с украинскими, он стёр бы и их.
+  if (L_.renderer) L_.renderer._redrawBounds = null;   // (РФ только что добавлены последними — они и так сверху)
+}
+// Где участки двух кадастров перекрываются, сверху — РФ (его карточка содержит и украинский блок).
+// Порядок на общем холсте = порядок добавления, поэтому после появления украинского слоя поднимаем РФ.
+function rfParcelsToFront() {
+  const l = RF_LAYERS.parcels.layer;
+  if (l && map.hasLayer(l)) l.bringToFront();
 }
 function toggleRfLayer(key, on) {
   rfWanted[key] = on;
@@ -1275,7 +1282,12 @@ function applyRfZoomGate() {
           pn.style.pointerEvents = 'none';    // но мышь их не замечает
         }
         const paneOpt = key === 'builds' ? { pane: 'rfBuilds' } : {};
-        L_.renderer = L.canvas(Object.assign({ padding: 0.2 }, paneOpt));
+        // ⚠️ Участки РФ рисуем на ТОМ ЖЕ холсте, что и украинские (рендерер карты по умолчанию).
+        // Каждый холст перекрывает всю карту, и события мыши получает только верхний: пока у РФ был
+        // свой холст, один из кадастров был целиком глух к наведению и клику — какой именно, зависело
+        // от порядка включения галочек. На общем холсте Leaflet сам находит верхний объект под
+        // курсором и проваливается к нижнему там, где верхнего нет.
+        L_.renderer = key === 'builds' ? L.canvas(Object.assign({ padding: 0.2 }, paneOpt)) : map.getRenderer({ options: {} });
         L_.layer = L.geoJSON(null, Object.assign({ renderer: L_.renderer, style: L_.style,
           onEachFeature: (f, l) => l.bindPopup(() => mk(f.properties), { maxWidth: 360 }) }, paneOpt));
         if (key !== 'builds') {
@@ -1340,6 +1352,7 @@ function applyUaLayer(on) {
     if (on) { if (!map.hasLayer(l)) l.addTo(map); }
     else if (map.hasLayer(l)) map.removeLayer(l);
   }
+  if (on) rfParcelsToFront();
   updUaCount();
 }
 // Слой «Размежёванные» (razmezh.geojson) — галочка в панели слоёв, она же единственный источник правды
@@ -2800,7 +2813,7 @@ if (_qs.get('genichesk') === '1') {
 }
 
 // Технический блок: зум (живой) + версия обновления (бампить при каждом апдейте)
-const BUILD_VERSION = 'v56';
+const BUILD_VERSION = 'v57';
 const techEl = document.createElement('div');
 techEl.id = 'techinfo';
 document.body.appendChild(techEl);
